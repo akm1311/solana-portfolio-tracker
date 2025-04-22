@@ -27,6 +27,7 @@ export const tokenSchema = z.object({
   price: z.number().optional(),
   value: z.number().optional(),
   change24h: z.number().optional(),
+  icon: z.string().optional(),
 });
 
 export type Token = z.infer<typeof tokenSchema>;

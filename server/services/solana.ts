@@ -57,6 +57,7 @@ export async function getSolanaTokens(walletAddress: string): Promise<TokenResul
           name: undefined,
           price: undefined,
           value: undefined,
+          icon: undefined,
         };
         
         tokens.push(token);
@@ -76,6 +77,7 @@ export async function getSolanaTokens(walletAddress: string): Promise<TokenResul
             uiBalance,
             price: undefined,
             value: undefined,
+            icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
           });
         }
       } catch (error) {
@@ -94,6 +96,7 @@ export async function getSolanaTokens(walletAddress: string): Promise<TokenResul
           if (metadata) {
             token.symbol = metadata.symbol;
             token.name = metadata.name;
+            token.icon = metadata.icon;
           }
         }
       } catch (error) {
@@ -116,34 +119,38 @@ export async function getSolanaTokens(walletAddress: string): Promise<TokenResul
 }
 
 // Helper to get token metadata using the Jupiter API for better token names and symbols
-async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, { symbol: string, name: string }>> {
+async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, { symbol: string, name: string, icon?: string }>> {
   try {
     console.log(`Fetching metadata for ${mints.length} tokens...`);
-    const results: Record<string, { symbol: string, name: string }> = {};
+    const results: Record<string, { symbol: string, name: string, icon?: string }> = {};
     
-    // Process tokens individually using the Jupiter API
-    // This is more reliable for token names and symbols
+    // Process tokens using Jupiter's search API
     for (const mint of mints) {
       try {
         console.log(`Fetching Jupiter metadata for token: ${mint}`);
-        const response = await axios.get(`https://fe-api.jup.ag/api/v1/tokens/${mint}`);
+        const response = await axios.get(`https://fe-api.jup.ag/api/v1/tokens/search?query=${mint}`);
         
-        if (response.data) {
-          const tokenData = response.data;
-          const symbol = tokenData.symbol || '';
-          // If a name is available use it, otherwise use the symbol 
-          const name = tokenData.name || tokenData.symbol || '';
+        if (response.data && response.data.tokens && response.data.tokens.length > 0) {
+          // Find exact matching token by address
+          const token = response.data.tokens.find((t: any) => t.address === mint);
           
-          results[mint] = {
-            symbol: symbol,
-            name: name
-          };
-          
-          console.log(`Got Jupiter metadata for ${mint}: ${name} (${symbol})`);
+          if (token) {
+            results[mint] = {
+              symbol: token.symbol || '',
+              name: token.name || token.symbol || '',
+              icon: token.icon || undefined
+            };
+            
+            console.log(`Got Jupiter metadata for ${mint}: ${token.name} (${token.symbol})`);
+            continue; // Skip to the next token in the loop
+          }
         }
-      } catch (error) {
-        console.log(`Jupiter API failed for ${mint}, trying fallback...`);
         
+        // If no results from search API or no match found, try fallback to Helius
+        console.log(`Jupiter search API didn't find ${mint}, trying fallback...`);
+        throw new Error("No matching token found in Jupiter search results");
+        
+      } catch (error) {
         // If Jupiter API fails, try the Helius API as fallback
         try {
           const response = await axios.post(HELIUS_RPC_URL, {
@@ -161,10 +168,12 @@ async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, { 
               // Get the best available name and symbol
               const name = item.name || item.onChainMetadata?.metadata?.data?.name || '';
               const symbol = item.symbol || item.onChainMetadata?.metadata?.data?.symbol || '';
+              const icon = item.logoURI || undefined;
               
               results[mint] = {
                 symbol: symbol,
-                name: name
+                name: name,
+                icon: icon
               };
               
               console.log(`Got Helius metadata for ${mint}: ${name} (${symbol})`);
@@ -190,7 +199,8 @@ async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, { 
     // Also add Solana native token manually to ensure it displays properly
     results["So11111111111111111111111111111111111111112"] = {
       symbol: "SOL",
-      name: "Solana"
+      name: "Solana",
+      icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png"
     };
     
     console.log(`Successfully retrieved metadata for ${Object.keys(results).length} tokens`);

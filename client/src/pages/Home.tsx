@@ -115,23 +115,6 @@ export default function Home() {
           <EmptyState type="no-tokens" onReset={resetPortfolio} />
         )}
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white dark:bg-dark-surface shadow-inner mt-auto">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col md:flex-row justify-between items-center text-sm text-slate-500 dark:text-slate-400">
-            <div className="mb-2 md:mb-0">
-              © {new Date().getFullYear()} Solana Portfolio Tracker
-            </div>
-            <div className="flex items-center gap-4">
-              <a href="#" className="hover:text-primary">About</a>
-              <a href="#" className="hover:text-primary">Privacy Policy</a>
-              <a href="#" className="hover:text-primary">Terms of Service</a>
-              <a href="#" className="hover:text-primary">Contact</a>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
