@@ -214,7 +214,35 @@ export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceRe
       'JitoExSAaJJYioV9NQ3XbQEsZdxsLPwMKBJUvPGgxYd', // JitoSOL
     ]);
     
-    // Apply token filtering
+    // Check liquidity using DexScreener API
+async function checkTokenLiquidity(mintAddress: string): Promise<boolean> {
+  try {
+    // Check if we've cached this token's liquidity status
+    const liquidityCache = getFromCache(path.join(TOKEN_CACHE_DIR, 'liquidity_cache.json')) || {};
+    
+    // Return cached value if available
+    if (liquidityCache[mintAddress] !== undefined) {
+      return liquidityCache[mintAddress];
+    }
+    
+    // Otherwise check with DexScreener
+    const response = await axios.get(`https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`);
+    
+    // If pairs is null, this token has no liquidity
+    const hasLiquidity = response.data.pairs !== null;
+    
+    // Cache the result
+    liquidityCache[mintAddress] = hasLiquidity;
+    saveToCache(path.join(TOKEN_CACHE_DIR, 'liquidity_cache.json'), liquidityCache);
+    
+    return hasLiquidity;
+  } catch (error) {
+    console.error(`Error checking liquidity for ${mintAddress}:`, error);
+    return false; // Assume no liquidity if there's an error
+  }
+}
+
+// Apply token filtering
     for (const mint of mintAddresses) {
       const price = cachedPrices[mint];
       
@@ -225,16 +253,23 @@ export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceRe
           continue;
         }
         
-        // Try to get metadata to check if this is a verified token
-        const metadata = await getTokenMetadata(mint);
+        // Try DexScreener first to check liquidity
+        const hasLiquidity = await checkTokenLiquidity(mint);
         
-        // Include verified or tokens with sufficient liquidity
-        if (metadata?.isVerified) {
+        if (hasLiquidity) {
+          // Token has liquidity according to DexScreener
           priceData[mint] = price;
         } else {
-          // Filter out low value tokens that might be rugs
-          // For now, we'll include all tokens but tag the filtered ones
-          priceData[mint] = price;
+          // Token has no liquidity, filter it out
+          filteredTokens.push(mint);
+          // Skip adding to priceData
+          continue;
+        }
+        
+        // As a backup, also check verification status
+        const metadata = await getTokenMetadata(mint);
+        if (!metadata?.isVerified) {
+          // Tag as potentially suspicious even if it has liquidity
           filteredTokens.push(mint);
         }
       }
