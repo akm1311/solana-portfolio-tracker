@@ -36,21 +36,33 @@ export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceRe
       // Log structure of the response to understand format
       console.log(`Response data structure: ${JSON.stringify(Object.keys(response.data))}`);
       
-      const data = response.data.data;
-      
-      if (data) {
-        console.log(`Received price data for ${Object.keys(data).length} tokens`);
+      // Check if the response has a 'prices' object (new API format)
+      if (response.data.prices) {
+        const prices = response.data.prices;
+        console.log(`Received price data for ${Object.keys(prices).length} tokens from 'prices' object`);
+        
+        // Merge price data from this batch into the main result
+        Object.entries(prices).forEach(([mint, price]) => {
+          if (typeof price === 'number') {
+            priceData[mint] = price;
+            console.log(`Added price for ${mint}: ${price}`);
+          }
+        });
+      } 
+      // Fall back to checking for 'data' property (old API format)
+      else if (response.data.data) {
+        const data = response.data.data;
+        console.log(`Received price data for ${Object.keys(data).length} tokens from 'data' object`);
         
         // Merge data from this batch into the main result
         Object.keys(data).forEach(mint => {
-          console.log(`Processing mint: ${mint}, data:`, JSON.stringify(data[mint]));
           if (data[mint] && typeof data[mint].price === 'number') {
             priceData[mint] = data[mint].price;
             console.log(`Added price for ${mint}: ${data[mint].price}`);
           }
         });
       } else {
-        console.log(`No data returned from Jupiter API in this batch`);
+        console.log(`No recognizable price data format in Jupiter API response`);
         console.log(`Full response: ${JSON.stringify(response.data)}`);
       }
     }
