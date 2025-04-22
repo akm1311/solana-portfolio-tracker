@@ -255,9 +255,40 @@ export default function TokenList({ portfolio }: TokenListProps) {
                         </div>
                         
                         <div>
-                          <div className="font-medium dark:text-white token-symbol">
-                            {token.name || 
-                             (token.symbol ? `${token.symbol} Token` : `Token ${token.mint.slice(0, 8)}...`)}
+                          <div 
+                            className="font-medium dark:text-white token-symbol cursor-pointer hover:text-primary hover:underline transition-colors flex items-center gap-1 group"
+                            onClick={() => {
+                              navigator.clipboard.writeText(token.mint);
+                              // Show a small tooltip or notification that address was copied
+                              const tooltip = document.createElement('div');
+                              tooltip.textContent = 'Mint address copied!';
+                              tooltip.className = 'fixed p-2 bg-black/80 text-white text-xs rounded shadow-lg z-50';
+                              tooltip.style.left = `${window.event ? (window.event as MouseEvent).clientX + 10 : 0}px`;
+                              tooltip.style.top = `${window.event ? (window.event as MouseEvent).clientY - 20 : 0}px`;
+                              document.body.appendChild(tooltip);
+                              setTimeout(() => tooltip.remove(), 1500);
+                            }}
+                            title={`Click to copy mint address: ${token.mint}`}
+                          >
+                            <span>
+                              {token.name || 
+                               (token.symbol ? `${token.symbol} Token` : `Token ${token.mint.slice(0, 8)}...`)}
+                            </span>
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              width="14" 
+                              height="14" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                            </svg>
                           </div>
                           <div className="text-xs text-slate-500 dark:text-slate-300 font-mono">
                             {token.symbol || 
