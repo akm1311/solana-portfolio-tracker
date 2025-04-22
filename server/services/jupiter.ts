@@ -1,14 +1,8 @@
 import axios from "axios";
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 const JUP_API_BASE_URL = "https://fe-api.jup.ag/api/v1";
-
-// ES Module equivalent of __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const TOKEN_CACHE_DIR = path.join(__dirname, '..', 'cache');
 const TOKEN_CACHE_FILE = path.join(TOKEN_CACHE_DIR, 'token_prices_cache.json');
 const TOKEN_METADATA_CACHE_FILE = path.join(TOKEN_CACHE_DIR, 'token_metadata_cache.json');

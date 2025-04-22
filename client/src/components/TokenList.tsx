@@ -222,14 +222,7 @@ export default function TokenList({ portfolio }: TokenListProps) {
             <tbody>
               {paginatedTokens.length > 0 ? (
                 paginatedTokens.map((token, index) => (
-                  <tr 
-                    key={token.mint} 
-                    className={`
-                      border-b border-slate-200 dark:border-slate-700 
-                      hover:bg-slate-50 dark:hover:bg-slate-800/50
-                      ${token.isLowLiquidity ? 'bg-red-50 dark:bg-red-950/20' : ''}
-                    `}
-                  >
+                  <tr key={token.mint} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                     <td className="py-4 text-sm text-slate-500 dark:text-slate-300">{startIndex + index + 1}</td>
                     <td className="py-4">
                       <div className="flex items-center">
@@ -262,25 +255,13 @@ export default function TokenList({ portfolio }: TokenListProps) {
                         </div>
                         
                         <div>
-                          <div className="font-medium dark:text-white token-symbol flex items-center">
+                          <div className="font-medium dark:text-white token-symbol">
                             {token.name || 
                              (token.symbol ? `${token.symbol} Token` : `Token ${token.mint.slice(0, 8)}...`)}
-                             
-                            {token.isLowLiquidity && (
-                              <span className="ml-2 px-1.5 py-0.5 text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded font-semibold">
-                                Low Liquidity
-                              </span>
-                            )}
                           </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-300 font-mono flex items-center">
+                          <div className="text-xs text-slate-500 dark:text-slate-300 font-mono">
                             {token.symbol || 
                              (token.mint.length > 10 ? `${token.mint.slice(0, 6)}...${token.mint.slice(-4)}` : token.mint)}
-                             
-                            {token.isLowLiquidity && (
-                              <span className="ml-2 text-xs text-red-500 dark:text-red-400">
-                                Value excluded from total
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
