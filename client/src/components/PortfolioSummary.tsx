@@ -9,7 +9,10 @@ interface PortfolioSummaryProps {
 
 interface AssetAllocation {
   name: string;
+  displayName: string;
   value: number;
+  valueFormatted: string;
+  percentage: string;
   color: string;
 }
 
@@ -49,34 +52,62 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
       .slice(5)
       .reduce((sum, token) => sum + (token.value || 0), 0);
     
-    // Create pie chart data
-    const chartData: AssetAllocation[] = topTokens.map((token, index) => ({
-      name: token.symbol || token.name || `Token ${token.mint.slice(0, 6)}...`,
-      value: token.value || 0,
-      color: getChartColor(index)
-    }));
+    // Create pie chart data with cleaner labels
+    const chartData: AssetAllocation[] = topTokens.map((token, index) => {
+      // Get a clean symbol - prefer the actual symbol, fallback to shorter options
+      let symbol = token.symbol || '';
+      
+      // Clean up any long symbols or weird characters
+      if (!symbol || symbol.length > 10 || symbol.includes('...')) {
+        // Try to use token name if symbol is problematic
+        if (token.name && token.name.length < 10 && !token.name.includes('...')) {
+          symbol = token.name;
+        } else {
+          // Last resort - use a very short version of mint
+          symbol = token.mint.slice(0, 4);
+        }
+      }
+      
+      return {
+        name: symbol,
+        displayName: symbol, // For cleaner display
+        value: token.value || 0,
+        valueFormatted: `$${(token.value || 0).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        })}`,
+        percentage: ((token.value || 0) / portfolio.totalValue * 100).toFixed(2) + '%',
+        color: getChartColor(index)
+      };
+    });
     
     // Add 'Other' category if there are more than 5 tokens
     if (otherTokensValue > 0) {
       chartData.push({
         name: "Other",
+        displayName: "Other",
         value: otherTokensValue,
+        valueFormatted: `$${otherTokensValue.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        })}`,
+        percentage: (otherTokensValue / portfolio.totalValue * 100).toFixed(2) + '%',
         color: getChartColor(5)
       });
     }
     
     return chartData;
-  }, [portfolio.tokens]);
+  }, [portfolio.tokens, portfolio.totalValue]);
   
-  // Get chart colors
+  // Get chart colors - using colors from reference image
   function getChartColor(index: number): string {
     const colors = [
-      "#3b82f6", // blue-500
-      "#10b981", // emerald-500
-      "#f59e0b", // amber-500
-      "#8b5cf6", // violet-500
-      "#ec4899", // pink-500
-      "#6b7280", // gray-500
+      "#c4ef65", // light green for USDC
+      "#38d9e6", // light blue for SOL
+      "#54c2a8", // teal for Watch
+      "#5871e4", // blue for TWIN
+      "#9775ea", // purple for SYBAU
+      "#f8a3a3", // light pink for "Other"
     ];
     return colors[index % colors.length];
   }
@@ -162,10 +193,10 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
           {/* Asset allocation pie chart */}
           {pieChartData.length > 0 && (
             <div className="mt-6">
-              <h3 className="text-lg font-medium mb-4 dark:text-white">Asset Allocation</h3>
-              <div className="bg-light-surface dark:bg-gray-800 rounded-lg p-4 border dark:border-gray-700">
-                <div className="flex flex-col md:flex-row items-center">
-                  <div className="w-full md:w-1/2 h-64">
+              <div className="bg-light-surface dark:bg-gray-800 rounded-lg p-6 border dark:border-gray-700">
+                <div className="flex flex-col items-center">
+                  {/* Chart */}
+                  <div className="w-full h-64 max-w-md mx-auto">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -175,51 +206,46 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
                           cx="50%"
                           cy="50%"
                           outerRadius={80}
-                          innerRadius={50}
+                          innerRadius={45}
                           labelLine={false}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          label={false} // Remove labels from chart directly
                         >
                           {pieChartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                            <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={1} />
                           ))}
                         </Pie>
-                        <Tooltip content={<CustomTooltip />} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                   
-                  <div className="w-full md:w-1/2 pl-0 md:pl-6 mt-4 md:mt-0">
-                    <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Top Holdings</h4>
-                    <div className="space-y-2">
+                  {/* Legend */}
+                  <div className="w-full mt-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {pieChartData.map((token, index) => (
-                        <div key={index} className="flex justify-between items-center">
-                          <div className="flex items-center">
-                            <div 
-                              className="w-3 h-3 rounded-full mr-2" 
-                              style={{ backgroundColor: token.color }}
-                            ></div>
-                            <span className="text-sm font-medium dark:text-slate-200">{token.name}</span>
+                        <div key={index} className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: token.color }}
+                          />
+                          <div className="flex gap-2 items-baseline flex-grow">
+                            <span className="text-sm font-medium dark:text-white">{token.name}</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400">({token.valueFormatted})</span>
                           </div>
-                          <div className="text-sm dark:text-slate-300">
-                            ${token.value.toLocaleString(undefined, { 
-                              minimumFractionDigits: 2, 
-                              maximumFractionDigits: 2 
-                            })}
-                          </div>
+                          <div className="text-sm font-bold dark:text-white">{token.percentage}</div>
                         </div>
                       ))}
                     </div>
-                    
-                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Total:</span>
-                        <span className="text-sm font-bold dark:text-primary">
-                          ${portfolio.totalValue.toLocaleString(undefined, { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 2 
-                          })}
-                        </span>
-                      </div>
+                  </div>
+                  
+                  {/* Tab-like buttons at the bottom */}
+                  <div className="mt-8 flex justify-center">
+                    <div className="inline-flex rounded-md overflow-hidden border dark:border-gray-600">
+                      <button className="px-4 py-2 bg-gray-700 text-white text-sm font-medium">
+                        Assets
+                      </button>
+                      <button className="px-4 py-2 bg-transparent text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-gray-800">
+                        Platforms
+                      </button>
                     </div>
                   </div>
                 </div>
