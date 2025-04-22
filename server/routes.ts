@@ -54,6 +54,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           });
           console.log(`Added price data to ${tokensWithPrices} out of ${tokens.length} tokens`);
+          
+          // Filter out tokens with organicScore = 0 (filtered tokens)
+          if (priceResults.filteredTokens && priceResults.filteredTokens.length > 0) {
+            console.log(`Filtering out ${priceResults.filteredTokens.length} low-quality tokens`);
+            
+            // Create a Set for O(1) lookups
+            const filteredTokensSet = new Set(priceResults.filteredTokens);
+            
+            // Filter the tokens array to remove low-quality tokens
+            tokens = tokens.filter(token => {
+              // Skip tokens without a mint for safety
+              if (!token.mint) return false;
+              
+              // Keep tokens that aren't in the filtered list
+              if (!filteredTokensSet.has(token.mint)) return true;
+              
+              // Filter out tokens with organicScore = 0
+              console.log(`Filtering out token: ${token.symbol || token.mint}`);
+              return false;
+            });
+            
+            console.log(`After filtering: ${tokens.length} tokens remaining`);
+          }
         } else {
           console.log(`Failed to get price data: ${priceResults.error}`);
         }
@@ -68,6 +91,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalValue,
         tokenCount: tokens.length,
         lastUpdated: new Date().toLocaleString(),
+        // Add detail about filtered tokens
+        filteredTokensCount: priceResults?.filteredTokens?.length || 0
       };
       
       return res.json(portfolioData);
