@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { getSolanaTokens } from "./services/solana";
 import { fetchTokenPrices } from "./services/jupiter";
 import { z } from "zod";
+import axios from "axios";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API endpoint to get portfolio data for a wallet
@@ -30,65 +31,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const tokens = tokensResult.data;
       
-      // If we have tokens, fetch prices from Jupiter API
+      // If we have tokens, get price data while fetching metadata
       if (tokens.length > 0) {
-        // Extract mint addresses
-        const mintAddresses = tokens.map(token => token.mint);
+        // We will try to get price data from token metadata first to reduce API calls
+        // This is already being done in getSolanaTokens
+        // For any tokens that don't have prices from metadata, we'll try Jupiter API
         
-        // First pass: Get all prices to determine token values
-        console.log(`Fetching price data for ${mintAddresses.length} tokens`);
-        const priceResults = await fetchTokenPrices(mintAddresses);
+        // Find tokens that already have price data from metadata
+        const tokensWithPrices = tokens.filter(token => token.price !== undefined);
+        const tokensWithoutPrices = tokens.filter(token => token.price === undefined);
         
-        if (priceResults.success) {
-          const prices = priceResults.data;
-          console.log(`Successfully received price data for ${Object.keys(prices).length} tokens`);
+        console.log(`${tokensWithPrices.length} tokens already have price data from metadata`);
+        console.log(`${tokensWithoutPrices.length} tokens need price data from Jupiter API`);
+        
+        // Only fetch prices for tokens that don't already have price data
+        if (tokensWithoutPrices.length > 0) {
+          const mintAddressesForPrices = tokensWithoutPrices.map(token => token.mint);
           
-          // Add price data to tokens and calculate values
-          tokens.forEach(token => {
-            if (prices[token.mint]) {
-              token.price = prices[token.mint];
-              token.value = token.uiBalance * token.price;
-            }
-          });
-          
-          // Second pass: Check liquidity only for high-value tokens
-          const highValueTokens = tokens.filter(token => token.value && token.value > 10000);
-          const lowValueTokens = tokens.filter(token => !token.value || token.value <= 10000);
-          
-          console.log(`Found ${highValueTokens.length} high-value tokens (>$10,000) to check liquidity`);
-          
-          // Create separate arrays for tokens to check and tokens to keep
-          const highValueMints = highValueTokens.map(token => token.mint);
-          
-          // Only check DexScreener liquidity for high value tokens
-          if (highValueMints.length > 0) {
-            console.log(`Checking liquidity for ${highValueMints.length} high-value tokens...`);
-            const liquidityResults = await fetchTokenPrices(highValueMints, true); // true flag for liquidity check
+          // First pass: Get prices for remaining tokens
+          console.log(`Fetching price data for ${mintAddressesForPrices.length} tokens without prices`);
+          try {
+            const priceResults = await fetchTokenPrices(mintAddressesForPrices);
             
-            if (liquidityResults.success) {
-              const verifiedPrices = liquidityResults.data;
-              const filteredTokens = liquidityResults.filteredTokens || [];
+            if (priceResults.success) {
+              const prices = priceResults.data;
+              console.log(`Successfully received price data for ${Object.keys(prices).length} tokens`);
               
-              // Filter the high-value tokens based on liquidity check
-              highValueTokens.forEach(token => {
-                if (!verifiedPrices[token.mint]) {
-                  // If the token was filtered out due to liquidity, mark it
+              // Add price data to tokens without prices
+              tokensWithoutPrices.forEach(token => {
+                if (prices[token.mint]) {
+                  token.price = prices[token.mint];
+                  token.value = token.uiBalance * token.price;
+                }
+              });
+            } else {
+              console.log(`Failed to get price data: ${priceResults.error}`);
+            }
+          } catch (error) {
+            console.error("Error fetching token prices:", error);
+          }
+        }
+        
+        // Calculate values for all tokens with prices
+        tokens.forEach(token => {
+          if (token.price) {
+            token.value = token.uiBalance * token.price;
+          }
+        });
+        
+        // Second pass: Check liquidity only for high-value tokens
+        const highValueTokens = tokens.filter(token => token.value && token.value > 10000);
+        const lowValueTokens = tokens.filter(token => !token.value || token.value <= 10000);
+        
+        console.log(`Found ${highValueTokens.length} high-value tokens (>$10,000) to check liquidity`);
+        
+        // Create separate arrays for tokens to check and tokens to keep
+        const highValueMints = highValueTokens.map(token => token.mint);
+        
+        // Only check DexScreener liquidity for high value tokens
+        if (highValueMints.length > 0) {
+          console.log(`Checking liquidity for ${highValueMints.length} high-value tokens...`);
+          try {
+            // Check each high-value token with DexScreener
+            for (const token of highValueTokens) {
+              try {
+                // Use DexScreener API to check if token has liquidity
+                const response = await axios.get(`https://api.dexscreener.com/latest/dex/tokens/${token.mint}`);
+                
+                // If pairs is null, this token has no liquidity
+                const hasLiquidity = response.data.pairs !== null;
+                
+                if (!hasLiquidity) {
+                  // Token has no liquidity, filter it out
                   token.price = undefined;
                   token.value = undefined;
-                  console.log(`Filtered out high-value token ${token.symbol || token.mint} due to liquidity check`);
+                  console.log(`Filtered out high-value token ${token.symbol || token.mint} due to no liquidity`);
                 } else {
                   console.log(`High-value token ${token.symbol || token.mint} passed liquidity check: Value=${token.value}`);
                 }
-              });
+              } catch (error) {
+                console.error(`Error checking liquidity for ${token.mint}:`, error);
+                // Don't filter if we couldn't check, to avoid false negatives
+              }
             }
+          } catch (error) {
+            console.error("Error in liquidity checking process:", error);
           }
-          
-          // Count tokens with price data
-          let tokensWithPrices = tokens.filter(token => token.price !== undefined).length;
-          console.log(`Added price data to ${tokensWithPrices} out of ${tokens.length} tokens`);
-        } else {
-          console.log(`Failed to get price data: ${priceResults.error}`);
         }
+        
+        // Count tokens with price data
+        let tokensWithPricesAfter = tokens.filter(token => token.price !== undefined).length;
+        console.log(`Final count: ${tokensWithPricesAfter} out of ${tokens.length} tokens with price data`);
       }
       
       // Calculate total value

@@ -84,19 +84,26 @@ export async function getSolanaTokens(walletAddress: string): Promise<TokenResul
         console.error("Error fetching SOL balance:", error);
       }
       
-      // Try to get token metadata for symbols and names
+      // Try to get token metadata for symbols, names, and prices
       try {
         // Get metadata for tokens in batches
         const mintAddresses = tokens.map(token => token.mint);
         const metadataResults = await getTokenMetadataBatch(mintAddresses);
         
-        // Update tokens with metadata
+        // Update tokens with metadata, including any price data if available
         for (const token of tokens) {
           const metadata = metadataResults[token.mint];
           if (metadata) {
             token.symbol = metadata.symbol;
             token.name = metadata.name;
             token.icon = metadata.icon;
+            
+            // If the metadata includes price info, use it
+            if (metadata.price) {
+              token.price = metadata.price;
+              token.value = token.uiBalance * metadata.price;
+              console.log(`Got price for ${token.symbol || token.mint} from metadata: ${metadata.price}`);
+            }
           }
         }
       } catch (error) {
@@ -119,10 +126,25 @@ export async function getSolanaTokens(walletAddress: string): Promise<TokenResul
 }
 
 // Helper to get token metadata using the Jupiter API for better token names and symbols
-async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, { symbol: string, name: string, icon?: string }>> {
+async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, { 
+  symbol: string, 
+  name: string, 
+  icon?: string, 
+  price?: number,
+  hasLiquidity?: boolean
+}>> {
   try {
     console.log(`Fetching metadata for ${mints.length} tokens...`);
-    const results: Record<string, { symbol: string, name: string, icon?: string }> = {};
+    const results: Record<string, { 
+      symbol: string, 
+      name: string, 
+      icon?: string,
+      price?: number,
+      hasLiquidity?: boolean
+    }> = {};
+    
+    // Store price data to avoid additional API calls
+    const priceData: Record<string, number> = {};
     
     // Process tokens using Jupiter's search API
     for (const mint of mints) {
@@ -135,11 +157,22 @@ async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, { 
           const token = response.data.tokens.find((t: any) => t.address === mint);
           
           if (token) {
+            // Extract price if available
+            const price = token.price || token.priceUsd || token.usdPrice || undefined;
+            
             results[mint] = {
               symbol: token.symbol || '',
               name: token.name || token.symbol || '',
-              icon: token.icon || undefined
+              icon: token.icon || undefined,
+              price: typeof price === 'number' ? price : undefined,
+              // If the token has a price, assume it has some liquidity
+              hasLiquidity: typeof price === 'number' && price > 0
             };
+            
+            // Store price data for later use
+            if (results[mint].price) {
+              priceData[mint] = results[mint].price as number;
+            }
             
             console.log(`Got Jupiter metadata for ${mint}: ${token.name} (${token.symbol})`);
             continue; // Skip to the next token in the loop
