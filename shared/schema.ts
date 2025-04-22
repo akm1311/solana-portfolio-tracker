@@ -28,6 +28,7 @@ export const tokenSchema = z.object({
   value: z.number().optional(),
   change24h: z.number().optional(),
   icon: z.string().optional(),
+  isLowLiquidity: z.boolean().optional(), // Flag for tokens with low liquidity or suspicious values
 });
 
 export type Token = z.infer<typeof tokenSchema>;

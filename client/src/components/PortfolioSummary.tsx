@@ -38,10 +38,10 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
     }
   }, [portfolio.lastUpdated]);
   
-  // Prepare data for the pie chart - get top 5 tokens by value
+  // Prepare data for the pie chart - get top 5 tokens by value, excluding low liquidity tokens
   const pieChartData = useMemo(() => {
     const tokensByValue = [...portfolio.tokens]
-      .filter(token => token.value && token.value > 0)
+      .filter(token => token.value && token.value > 0 && !token.isLowLiquidity)
       .sort((a, b) => (b.value || 0) - (a.value || 0));
     
     // Take top 5 tokens
@@ -251,6 +251,27 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
                           })}
                         </span>
                       </div>
+                      
+                      {/* Show warning about low liquidity tokens if any exist */}
+                      {portfolio.tokens.some(token => token.isLowLiquidity) && (
+                        <div className="mt-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                          <div className="flex items-start">
+                            <svg 
+                              className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 mr-1.5 flex-shrink-0" 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              fill="none"
+                              viewBox="0 0 24 24" 
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <span>
+                              Some token values were excluded from the total due to low liquidity or suspicious pricing.
+                              These tokens are marked in the token list below.
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
