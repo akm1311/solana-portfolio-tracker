@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { getSolanaTokens } from "./services/solana";
 import { fetchTokenPrices } from "./services/jupiter";
 import { z } from "zod";
+import axios from "axios";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API endpoint to get portfolio data for a wallet
@@ -51,30 +52,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const validTokens: typeof initialTokens = [];
           
           // Process each token
-          for (const token of initialTokens) {
+          for (const token of initialTokens) {             
             if (prices[token.mint]) {
               // Add price and value data
               token.price = prices[token.mint];
               token.value = token.uiBalance * token.price;
               tokensWithPrices++;
               
-              // Check if this token is in the filtered list
+              // Process the token
+              console.log(`Processing token ${token.symbol || token.mint} (${token.mint}) with value $${token.value.toFixed(2)}`);
+              
+              // Check if this token is in the filtered list (liquidity check from the initial check)
               const isFiltered = priceResults.filteredTokens?.includes(token.mint) || false;
               
-              // Skip tokens with very low liquidity (below $1000) unless they have significant value
+              // Skip tokens with very low liquidity (below $1000) and low value
               if (isFiltered && token.value < 10) {
                 console.log(`Filtering out low liquidity token ${token.symbol || token.mint} with value $${token.value.toFixed(2)}`);
                 continue;
               }
               
-              if (isFiltered) {
-                console.log(`Including potentially low liquidity token ${token.symbol || token.mint} due to high value ($${token.value.toFixed(2)})`);
-              } else {
-                console.log(`Token ${token.symbol || token.mint}: Price=${token.price}, Balance=${token.uiBalance}, Value=${token.value}`);
+              // Add this token to valid tokens by default
+              let isValid = true;
+              
+              // For high-value tokens (>$10k), do a more rigorous liquidity check
+              if (token.value > 10000 || token.symbol === "MYSPACE") { // Also check known problematic tokens
+                try {
+                  console.log(`Token ${token.symbol || token.mint} has high value ($${token.value.toFixed(2)}), checking BullX API`);
+                  
+                  // Query BullX API directly for high-value tokens
+                  const BULLX_API_URL = "https://api-neo.bullx.io/v2/searchV3";
+                  const SOLANA_CHAIN_ID = "1399811149";
+                  
+                  const params = {
+                    q: token.mint,
+                    chainIds: SOLANA_CHAIN_ID
+                  };
+                  
+                  const response = await axios.get(BULLX_API_URL, { params });
+                  
+                  // Check if response is empty array - likely a scam token
+                  if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+                    console.log(`BullX API returned empty results for ${token.mint} (${token.symbol}) - filtering out scam token`);
+                    isValid = false;
+                  } else {
+                    // Find the token in the response
+                    const tokenData = response.data.find((t: any) => t.address === token.mint);
+                    
+                    // Check liquidity
+                    if (tokenData && tokenData.liquidity !== undefined) {
+                      const liquidity = parseFloat(tokenData.liquidity) || 0;
+                      console.log(`BullX API reports liquidity for ${token.mint} (${token.symbol}): $${liquidity}`);
+                      
+                      // Filter out if liquidity is below threshold
+                      if (liquidity < 1000) {
+                        console.log(`Filtering out token ${token.symbol} due to low liquidity: $${liquidity}`);
+                        isValid = false;
+                      }
+                    } else {
+                      console.log(`No liquidity data found in BullX API for ${token.mint} (${token.symbol}) - filtering out`);
+                      isValid = false;
+                    }
+                  }
+                } catch (error) {
+                  console.error(`Error checking BullX API for ${token.mint} (${token.symbol}):`, error);
+                  // On error, we'll keep the token (err on the side of showing more data)
+                }
               }
               
-              // Add to filtered list
-              validTokens.push(token);
+              // Final decision on whether to include the token
+              if (isValid) {
+                if (isFiltered) {
+                  console.log(`Including token ${token.symbol || token.mint} despite initial filtering ($${token.value.toFixed(2)})`);
+                } else {
+                  console.log(`Including token ${token.symbol || token.mint}: Price=${token.price}, Value=${token.value.toFixed(2)}`);
+                }
+                validTokens.push(token);
+              }
             }
           }
           
