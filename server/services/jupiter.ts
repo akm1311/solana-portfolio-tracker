@@ -46,7 +46,6 @@ interface TokenMetadata {
   isVerified?: boolean;
   liquidity?: number;
   hasLiquidity?: boolean;
-  organicScore?: number; // Add organicScore field
 }
 
 // Cache management functions
@@ -97,8 +96,8 @@ export async function getTokenMetadata(mintAddress: string): Promise<TokenMetada
     // Not in cache, fetch from API
     const response = await axios.get(`${JUP_API_BASE_URL}/tokens/search?query=${mintAddress}`);
     
-    if (response.data && response.data.tokens && response.data.tokens.length > 0) {
-      const tokenData = response.data.tokens.find((token: any) => token.address === mintAddress);
+    if (response.data && response.data.data && response.data.data.length > 0) {
+      const tokenData = response.data.data.find((token: any) => token.address === mintAddress);
       
       if (tokenData) {
         const metadata: TokenMetadata = {
@@ -106,11 +105,8 @@ export async function getTokenMetadata(mintAddress: string): Promise<TokenMetada
           name: tokenData.name || '',
           icon: tokenData.logoURI || undefined,
           isVerified: tokenData.tags?.includes('verified') || false,
-          hasLiquidity: true, // Assume tokens returned by Jupiter have some liquidity
-          organicScore: tokenData.organicScore !== undefined ? tokenData.organicScore : undefined
+          hasLiquidity: true // Assume tokens returned by Jupiter have some liquidity
         };
-
-        console.log(`Token ${mintAddress} (${metadata.symbol}): organicScore = ${metadata.organicScore}`);
 
         // Update cache
         metadataCache[mintAddress] = metadata;
@@ -232,19 +228,12 @@ export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceRe
         // Try to get metadata to check if this is a verified token
         const metadata = await getTokenMetadata(mint);
         
-        // Check organicScore - if it's 0, exclude the token
-        if (metadata?.organicScore === 0) {
-          console.log(`Filtering out token with mint ${mint} due to organicScore = 0`);
-          filteredTokens.push(mint);
-          continue;
-        }
-        
         // Include verified or tokens with sufficient liquidity
-        if (metadata?.isVerified || metadata?.organicScore) {
+        if (metadata?.isVerified) {
           priceData[mint] = price;
         } else {
-          // For tokens without a known organicScore, be cautious
-          console.log(`Unknown quality for token ${mint}, including but flagged as filtered`);
+          // Filter out low value tokens that might be rugs
+          // For now, we'll include all tokens but tag the filtered ones
           priceData[mint] = price;
           filteredTokens.push(mint);
         }
