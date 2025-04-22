@@ -28,7 +28,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const tokens = tokensResult.data;
+      let tokens = tokensResult.data;
       
       // If we have tokens, fetch prices from Jupiter API
       if (tokens.length > 0) {

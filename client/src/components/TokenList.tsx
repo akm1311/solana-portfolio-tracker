@@ -83,6 +83,27 @@ export default function TokenList({ portfolio }: TokenListProps) {
     setCurrentPage(1);
   };
 
+  // Copy token address to clipboard
+  const copyTokenAddress = (token: Token) => {
+    navigator.clipboard.writeText(token.mint)
+      .then(() => {
+        toast({
+          title: "Address copied!",
+          description: `${token.symbol || token.name || 'Token'} address copied to clipboard`,
+          duration: 3000,
+        });
+      })
+      .catch(err => {
+        console.error("Failed to copy address:", err);
+        toast({
+          title: "Copy failed",
+          description: "Could not copy token address to clipboard",
+          variant: "destructive",
+          duration: 3000,
+        });
+      });
+  };
+
   // Generate random gradient colors for tokens without symbols
   const getTokenColor = (index: number, symbol?: string) => {
     if (symbol) {
@@ -257,9 +278,28 @@ export default function TokenList({ portfolio }: TokenListProps) {
                         </div>
                         
                         <div>
-                          <div className="font-medium dark:text-white token-symbol">
+                          <div 
+                            className="font-medium dark:text-white token-symbol cursor-pointer hover:text-primary hover:underline flex items-center"
+                            onClick={() => copyTokenAddress(token)}
+                            title={`Click to copy ${token.mint}`}
+                          >
                             {token.name || 
                              (token.symbol ? `${token.symbol} Token` : `Token ${token.mint.slice(0, 8)}...`)}
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              width="14" 
+                              height="14" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              className="ml-1 opacity-50 hover:opacity-100"
+                            >
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
                           </div>
                           <div className="text-xs text-slate-500 dark:text-slate-300 font-mono">
                             {token.symbol || 
