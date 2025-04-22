@@ -15,8 +15,12 @@ const CACHE_EXPIRY = 3600000; // 1 hour in milliseconds
 
 // Minimum liquidity threshold for tokens to be considered valid (in USD)
 const MIN_LIQUIDITY_THRESHOLD = 1000;
-// Maximum token value as percentage of portfolio for "unknown" tokens
-const MAX_TOKEN_VALUE_PERCENT = 5;
+// Threshold for doing deep liquidity check with BullX API
+const DEEP_LIQUIDITY_CHECK_THRESHOLD = 10000; // $10k value
+// BullX API endpoint for token liquidity data
+const BULLX_API_URL = "https://api-neo.bullx.io/v2/searchV3";
+// Solana Chain ID for BullX API
+const SOLANA_CHAIN_ID = 1399811149;
 
 // Create cache directory if it doesn't exist
 try {
@@ -80,6 +84,56 @@ function getFromCache(cacheFile: string): any | null {
   } catch (error) {
     console.error(`Error reading from cache ${cacheFile}:`, error);
     return null;
+  }
+}
+
+// Check token liquidity via BullX API
+async function checkTokenLiquidity(mintAddress: string): Promise<number> {
+  try {
+    console.log(`Checking liquidity for token ${mintAddress} via BullX API`);
+    
+    // Check cache first
+    const metadataCache = getFromCache(TOKEN_METADATA_CACHE_FILE) || {};
+    
+    // Return cached liquidity value if available
+    if (metadataCache[mintAddress] && metadataCache[mintAddress].liquidity !== undefined) {
+      console.log(`Found cached liquidity for ${mintAddress}: $${metadataCache[mintAddress].liquidity}`);
+      return metadataCache[mintAddress].liquidity || 0;
+    }
+    
+    // Query BullX API
+    const params = {
+      q: mintAddress,
+      chainIds: SOLANA_CHAIN_ID
+    };
+    
+    const response = await axios.get(BULLX_API_URL, { params });
+    
+    // Process response
+    if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+      // Find the token in the response (that matches our mint address)
+      const tokenData = response.data.find(token => token.address === mintAddress);
+      
+      if (tokenData && tokenData.liquidity !== undefined) {
+        const liquidity = parseFloat(tokenData.liquidity) || 0;
+        console.log(`BullX API reports liquidity for ${mintAddress} (${tokenData.symbol}): $${liquidity}`);
+        
+        // Update cache with liquidity data
+        if (metadataCache[mintAddress]) {
+          metadataCache[mintAddress].liquidity = liquidity;
+          saveToCache(TOKEN_METADATA_CACHE_FILE, metadataCache);
+        }
+        
+        return liquidity;
+      }
+    }
+    
+    // Default to 0 liquidity if not found
+    console.log(`No liquidity data found in BullX API for ${mintAddress}`);
+    return 0;
+  } catch (error) {
+    console.error(`Error checking liquidity for ${mintAddress}:`, error);
+    return 0;
   }
 }
 
@@ -228,15 +282,38 @@ export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceRe
         // Try to get metadata to check if this is a verified token
         const metadata = await getTokenMetadata(mint);
         
-        // Include verified or tokens with sufficient liquidity
+        // Calculate the token value in USD (used to determine if we need a deep liquidity check)
+        const token = mintAddresses.find(t => t === mint);
+        const tokenBalanceInfo = token ? { balance: 0, uiBalance: 0, decimals: 0 } : null;
+        const tokenValue = tokenBalanceInfo?.uiBalance ? tokenBalanceInfo.uiBalance * price : 0;
+        
+        // Include verified tokens immediately
         if (metadata?.isVerified) {
           priceData[mint] = price;
-        } else {
-          // Filter out low value tokens that might be rugs
-          // For now, we'll include all tokens but tag the filtered ones
-          priceData[mint] = price;
-          filteredTokens.push(mint);
+          continue;
         }
+        
+        // For high-value tokens (>$10k) that aren't verified, do a deep liquidity check via BullX API
+        if (tokenValue > DEEP_LIQUIDITY_CHECK_THRESHOLD) {
+          console.log(`Token ${mint} has high value ($${tokenValue.toFixed(2)}), performing deep liquidity check`);
+          const liquidity = await checkTokenLiquidity(mint);
+          
+          // If liquidity is above threshold, include the token
+          if (liquidity >= MIN_LIQUIDITY_THRESHOLD) {
+            priceData[mint] = price;
+            console.log(`Including token ${mint} with sufficient liquidity ($${liquidity})`);
+            continue;
+          } else {
+            console.log(`Filtering out token ${mint} due to insufficient liquidity ($${liquidity})`);
+            filteredTokens.push(mint);
+            continue;
+          }
+        }
+        
+        // For other tokens, include them in filtered tokens but still provide the price
+        // The frontend will handle display based on the filtered status
+        priceData[mint] = price;
+        filteredTokens.push(mint);
       }
     }
     

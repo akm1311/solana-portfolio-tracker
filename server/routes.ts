@@ -43,17 +43,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const prices = priceResults.data;
           console.log(`Successfully received price data for ${Object.keys(prices).length} tokens`);
           
-          // Add price data to tokens
+          // Add price data to tokens and filter low liquidity tokens
           let tokensWithPrices = 0;
-          tokens.forEach(token => {
+          
+          // Create a new filtered array of tokens
+          const validTokens = tokens.filter(token => {
+            // If we have price data for this token
             if (prices[token.mint]) {
+              // Add price and value data
               token.price = prices[token.mint];
               token.value = token.uiBalance * token.price;
               tokensWithPrices++;
+              
+              // Check if this token is in the filtered list
+              const isFiltered = priceResults.filteredTokens?.includes(token.mint) || false;
+              
+              // Skip tokens with very low liquidity (below $1000) unless they're exempted
+              if (isFiltered) {
+                // Only retain tokens with significant value
+                if (token.value >= 10) {
+                  console.log(`Including potentially low liquidity token ${token.symbol || token.mint} due to high value ($${token.value.toFixed(2)})`);
+                  return true;
+                }
+                console.log(`Filtering out low liquidity token ${token.symbol || token.mint} with value $${token.value.toFixed(2)}`);
+                return false;
+              }
+              
+              // Log token details for tokens we're keeping
               console.log(`Token ${token.symbol || token.mint}: Price=${token.price}, Balance=${token.uiBalance}, Value=${token.value}`);
+              return true;
             }
+            
+            // No price data, exclude from results
+            return false;
           });
+          
           console.log(`Added price data to ${tokensWithPrices} out of ${tokens.length} tokens`);
+          console.log(`Filtered down to ${validTokens.length} valid tokens after liquidity check`);
+          
+          // Replace the tokens array with our filtered version
+          tokens = validTokens;
         } else {
           console.log(`Failed to get price data: ${priceResults.error}`);
         }

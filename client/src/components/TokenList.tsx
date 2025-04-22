@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import type { Portfolio, Token } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 interface TokenListProps {
   portfolio: Portfolio;
@@ -17,6 +18,7 @@ export default function TokenList({ portfolio }: TokenListProps) {
   const [sortField, setSortField] = useState<SortField>("value");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc"); // Default to highest value first
   const itemsPerPage = 10; // Increased from 5 to show more tokens
+  const { toast } = useToast(); // For showing copy notifications
 
   // Filter tokens based on search query and token type
   const filteredTokens = useMemo(() => {
