@@ -25,7 +25,7 @@ export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceRe
     // Process each batch
     for (const batch of batches) {
       const addressList = batch.join(',');
-      const url = `${JUP_API_BASE_URL}/prices?ids=${addressList}`;
+      const url = `${JUP_API_BASE_URL}/prices?list_address=${addressList}`;
       
       console.log(`Fetching batch of ${batch.length} tokens from Jupiter API`);
       console.log(`Request URL: ${url}`);
@@ -43,8 +43,10 @@ export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceRe
         
         // Merge data from this batch into the main result
         Object.keys(data).forEach(mint => {
-          if (data[mint] && data[mint].price) {
+          console.log(`Processing mint: ${mint}, data:`, JSON.stringify(data[mint]));
+          if (data[mint] && typeof data[mint].price === 'number') {
             priceData[mint] = data[mint].price;
+            console.log(`Added price for ${mint}: ${data[mint].price}`);
           }
         });
       } else {

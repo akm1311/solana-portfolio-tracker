@@ -36,18 +36,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const mintAddresses = tokens.map(token => token.mint);
         
         // Fetch prices in batches of 100
+        console.log(`Fetching price data for ${mintAddresses.length} tokens`);
         const priceResults = await fetchTokenPrices(mintAddresses);
         
         if (priceResults.success) {
           const prices = priceResults.data;
+          console.log(`Successfully received price data for ${Object.keys(prices).length} tokens`);
           
           // Add price data to tokens
+          let tokensWithPrices = 0;
           tokens.forEach(token => {
             if (prices[token.mint]) {
               token.price = prices[token.mint];
               token.value = token.uiBalance * token.price;
+              tokensWithPrices++;
+              console.log(`Token ${token.symbol || token.mint}: Price=${token.price}, Balance=${token.uiBalance}, Value=${token.value}`);
             }
           });
+          console.log(`Added price data to ${tokensWithPrices} out of ${tokens.length} tokens`);
+        } else {
+          console.log(`Failed to get price data: ${priceResults.error}`);
         }
       }
       
