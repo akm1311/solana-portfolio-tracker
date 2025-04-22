@@ -82,7 +82,7 @@ export default function WalletInput({ onSubmit, isLoading }: WalletInputProps) {
         </Form>
         
         <div className="mt-4 text-xs text-slate-500 dark:text-slate-300">
-          <p>Example: 9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM</p>
+          <p>Example: Ai5spT4zukruzSm8m67ro1E2iuu92foU1fi1EvhMTPxj</p>
         </div>
       </div>
     </div>
