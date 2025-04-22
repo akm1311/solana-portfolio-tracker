@@ -18,48 +18,48 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
 
   return (
     <div className="max-w-5xl mx-auto mb-6">
-      <div className="bg-white dark:bg-dark-surface rounded-lg shadow-md p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 portfolio-card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Portfolio Summary</h2>
-          <div className="text-sm font-medium text-slate-500 dark:text-slate-400">
+          <h2 className="text-xl font-semibold dark:text-white portfolio-header">Portfolio Summary</h2>
+          <div className="text-sm font-medium text-slate-500 dark:text-slate-300">
             Last updated: <span>{portfolio.lastUpdated}</span>
           </div>
         </div>
         
-        <div className="overflow-x-auto pb-2">
+        <div className="overflow-x-auto pb-2 portfolio-summary">
           <div className="flex flex-wrap md:flex-nowrap gap-4">
-            <div className="bg-light-surface dark:bg-slate-800 rounded-lg p-4 w-full md:w-1/3">
-              <div className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Portfolio Value</div>
-              <div className="text-2xl font-bold mt-1">
+            <div className="bg-light-surface dark:bg-gray-800 rounded-lg p-4 w-full md:w-1/3 border dark:border-gray-700">
+              <div className="text-sm font-medium text-slate-500 dark:text-slate-300">Total Portfolio Value</div>
+              <div className="text-2xl font-bold mt-1 dark:text-primary">
                 ${portfolio.totalValue.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2
                 })}
               </div>
               {/* We don't have 24h change data in this implementation */}
-              <div className="text-slate-500 dark:text-slate-400 mt-1 text-sm font-medium">
+              <div className="text-slate-500 dark:text-slate-300 mt-1 text-sm font-medium">
                 Based on current token prices
               </div>
             </div>
             
-            <div className="bg-light-surface dark:bg-slate-800 rounded-lg p-4 w-full md:w-1/3">
-              <div className="text-sm font-medium text-slate-500 dark:text-slate-400">Token Count</div>
-              <div className="text-2xl font-bold mt-1">{portfolio.tokenCount} Tokens</div>
-              <div className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
-                <span className="text-primary">{nftCount} NFTs</span> • <span className="text-secondary">{splTokenCount} SPL Tokens</span>
+            <div className="bg-light-surface dark:bg-gray-800 rounded-lg p-4 w-full md:w-1/3 border dark:border-gray-700">
+              <div className="text-sm font-medium text-slate-500 dark:text-slate-300">Token Count</div>
+              <div className="text-2xl font-bold mt-1 dark:text-primary-foreground">{portfolio.tokenCount} Tokens</div>
+              <div className="text-sm font-medium text-slate-500 dark:text-slate-300 mt-1">
+                <span className="text-blue-500 dark:text-blue-400">{nftCount} NFTs</span> • <span className="text-green-500 dark:text-green-400">{splTokenCount} SPL Tokens</span>
               </div>
             </div>
             
-            <div className="bg-light-surface dark:bg-slate-800 rounded-lg p-4 w-full md:w-1/3">
-              <div className="text-sm font-medium text-slate-500 dark:text-slate-400">Wallet Address</div>
-              <div className="text-sm font-mono mt-1 truncate" title={portfolio.address}>
+            <div className="bg-light-surface dark:bg-gray-800 rounded-lg p-4 w-full md:w-1/3 border dark:border-gray-700">
+              <div className="text-sm font-medium text-slate-500 dark:text-slate-300">Wallet Address</div>
+              <div className="text-sm font-mono mt-1 truncate dark:text-white" title={portfolio.address}>
                 {formatAddress(portfolio.address)}
               </div>
               <a 
                 href={`https://explorer.solana.com/address/${portfolio.address}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 text-primary text-sm font-medium inline-flex items-center"
+                className="mt-1 text-primary text-sm font-medium inline-flex items-center dark:text-blue-400 hover:underline"
               >
                 <svg 
                   className="h-3 w-3 mr-1" 

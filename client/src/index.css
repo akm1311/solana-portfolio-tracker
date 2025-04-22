@@ -3,49 +3,52 @@
 @tailwind utilities;
 
 :root {
-      --background: 0 0% 100%;
---foreground: 20 14.3% 4.1%;
---muted: 60 4.8% 95.9%;
---muted-foreground: 25 5.3% 44.7%;
---popover: 0 0% 100%;
---popover-foreground: 20 14.3% 4.1%;
---card: 0 0% 100%;
---card-foreground: 20 14.3% 4.1%;
---border: 20 5.9% 90%;
---input: 20 5.9% 90%;
---primary: 207 90% 54%;
---primary-foreground: 211 100% 99%;
---secondary: 60 4.8% 95.9%;
---secondary-foreground: 24 9.8% 10%;
---accent: 60 4.8% 95.9%;
---accent-foreground: 24 9.8% 10%;
---destructive: 0 84.2% 60.2%;
---destructive-foreground: 60 9.1% 97.8%;
---ring: 20 14.3% 4.1%;
---radius: 0.5rem;
-  }
-  .dark {
-      --background: 240 10% 3.9%;
---foreground: 0 0% 98%;
---muted: 240 3.7% 15.9%;
---muted-foreground: 240 5% 64.9%;
---popover: 240 10% 3.9%;
---popover-foreground: 0 0% 98%;
---card: 240 10% 3.9%;
---card-foreground: 0 0% 98%;
---border: 240 3.7% 15.9%;
---input: 240 3.7% 15.9%;
---primary: 207 90% 54%;
---primary-foreground: 211 100% 99%;
---secondary: 240 3.7% 15.9%;
---secondary-foreground: 0 0% 98%;
---accent: 240 3.7% 15.9%;
---accent-foreground: 0 0% 98%;
---destructive: 0 62.8% 30.6%;
---destructive-foreground: 0 0% 98%;
---ring: 240 4.9% 83.9%;
---radius: 0.5rem;
-  }
+  /* Light Mode - Brighter and more contrast */
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215 16% 47%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222 47% 11%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 215 20.2% 65.1%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* Dark Mode - Higher contrast and better readability */
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 217 91% 60%;
+  --radius: 0.5rem;
+}
 
 @layer base {
   * {
@@ -55,5 +58,62 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+}
+
+/* Custom styles for the token list and portfolio */
+.token-list-table {
+  @apply w-full border-collapse;
+}
+
+.token-list-table th {
+  @apply p-3 text-left font-semibold text-base;
+}
+
+.token-list-table td {
+  @apply p-3 border-t text-sm;
+}
+
+.token-list-table tr:hover {
+  @apply bg-muted/50;
+}
+
+.dark .token-list-table th {
+  @apply text-white;
+}
+
+.dark .token-list-table td {
+  @apply border-gray-700 text-gray-100;
+}
+
+.dark .token-symbol {
+  @apply font-medium text-primary-foreground;
+}
+
+.dark .token-amount {
+  @apply text-primary-foreground/90;
+}
+
+.dark .token-value {
+  @apply font-semibold text-primary;
+}
+
+.portfolio-card {
+  @apply rounded-xl shadow-lg overflow-hidden;
+}
+
+.dark .portfolio-card {
+  @apply border border-gray-800 bg-gray-900/50;
+}
+
+.portfolio-header {
+  @apply text-xl font-bold bg-primary text-primary-foreground p-4;
+}
+
+.portfolio-summary {
+  @apply p-4;
+}
+
+.dark .portfolio-summary {
+  @apply text-gray-100;
 }
 

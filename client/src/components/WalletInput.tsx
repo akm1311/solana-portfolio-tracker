@@ -25,8 +25,8 @@ export default function WalletInput({ onSubmit, isLoading }: WalletInputProps) {
 
   return (
     <div className="max-w-3xl mx-auto mb-8">
-      <div className="bg-white dark:bg-dark-surface rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4">Enter Solana Wallet Address</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 portfolio-card">
+        <h2 className="text-xl font-semibold mb-4 dark:text-white">Enter Solana Wallet Address</h2>
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -40,11 +40,11 @@ export default function WalletInput({ onSubmit, isLoading }: WalletInputProps) {
                       <Input
                         {...field}
                         placeholder="Enter Solana wallet address..."
-                        className="w-full px-4 py-2 font-mono text-sm"
+                        className="w-full px-4 py-2 font-mono text-sm dark:bg-gray-800 dark:text-white dark:border-gray-700"
                         disabled={isLoading}
                       />
                     </FormControl>
-                    <FormMessage />
+                    <FormMessage className="text-red-500 dark:text-red-400" />
                   </FormItem>
                 )}
               />
@@ -52,7 +52,7 @@ export default function WalletInput({ onSubmit, isLoading }: WalletInputProps) {
               <Button 
                 type="submit"
                 disabled={isLoading}
-                className="bg-primary hover:bg-opacity-90 text-white"
+                className="bg-primary hover:bg-primary/90 text-white dark:bg-primary dark:hover:bg-primary/90 dark:text-white"
               >
                 {isLoading ? (
                   <>
@@ -81,7 +81,7 @@ export default function WalletInput({ onSubmit, isLoading }: WalletInputProps) {
           </form>
         </Form>
         
-        <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+        <div className="mt-4 text-xs text-slate-500 dark:text-slate-300">
           <p>Example: 9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM</p>
         </div>
       </div>

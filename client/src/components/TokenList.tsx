@@ -57,14 +57,14 @@ export default function TokenList({ portfolio }: TokenListProps) {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="bg-white dark:bg-dark-surface rounded-lg shadow-md p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 portfolio-card">
         <div className="flex justify-between items-center mb-4 flex-col md:flex-row gap-3">
-          <h2 className="text-xl font-semibold">Token Holdings</h2>
+          <h2 className="text-xl font-semibold portfolio-header dark:text-white">Token Holdings</h2>
           <div className="flex items-center gap-2 w-full md:w-auto">
             <div className="relative flex-grow md:flex-grow-0">
               <Input
                 type="text"
-                className="pl-8 pr-3 py-1.5 text-sm w-full md:w-60"
+                className="pl-8 pr-3 py-1.5 text-sm w-full md:w-60 dark:bg-gray-800 dark:text-white"
                 placeholder="Search tokens..."
                 value={searchQuery}
                 onChange={(e) => {
@@ -92,7 +92,7 @@ export default function TokenList({ portfolio }: TokenListProps) {
                 setCurrentPage(1); // Reset to first page on filter change
               }}
             >
-              <SelectTrigger className="py-1.5 px-3 text-sm h-9 w-[120px]">
+              <SelectTrigger className="py-1.5 px-3 text-sm h-9 w-[120px] dark:bg-gray-800 dark:text-white">
                 <SelectValue placeholder="All Tokens" />
               </SelectTrigger>
               <SelectContent>
@@ -105,33 +105,33 @@ export default function TokenList({ portfolio }: TokenListProps) {
         </div>
         
         <div className="overflow-x-auto">
-          <table className="min-w-full">
+          <table className="min-w-full token-list-table">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="pb-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-12">#</th>
-                <th className="pb-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Token</th>
-                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Balance</th>
-                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Price</th>
-                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Value</th>
+                <th className="pb-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider w-12">#</th>
+                <th className="pb-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Token</th>
+                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Balance</th>
+                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Price</th>
+                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Value</th>
               </tr>
             </thead>
             <tbody>
               {paginatedTokens.length > 0 ? (
                 paginatedTokens.map((token, index) => (
-                  <tr key={token.mint} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                    <td className="py-4 text-sm text-slate-500 dark:text-slate-400">{startIndex + index + 1}</td>
+                  <tr key={token.mint} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <td className="py-4 text-sm text-slate-500 dark:text-slate-300">{startIndex + index + 1}</td>
                     <td className="py-4">
                       <div className="flex items-center">
                         <div className={`h-8 w-8 rounded-full bg-gradient-to-r ${getTokenColor(index, token.symbol)} flex items-center justify-center text-white mr-3`}>
                           {token.symbol?.slice(0, 3) || "???"}
                         </div>
                         <div>
-                          <div className="font-medium">{token.name || 'Unknown Token'}</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{token.symbol || token.mint.slice(0, 6)}</div>
+                          <div className="font-medium dark:text-white token-symbol">{token.name || 'Unknown Token'}</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-300 font-mono">{token.symbol || token.mint.slice(0, 6)}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 text-right font-mono">
+                    <td className="py-4 text-right font-mono dark:text-slate-300 token-amount">
                       <div className="font-medium">{token.uiBalance.toLocaleString(undefined, {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: token.decimals > 6 ? 4 : 2
@@ -145,7 +145,7 @@ export default function TokenList({ portfolio }: TokenListProps) {
                         </div>
                       )}
                     </td>
-                    <td className="py-4 text-right">
+                    <td className="py-4 text-right dark:text-slate-300">
                       {token.price ? (
                         <div className="font-medium">${token.price.toLocaleString(undefined, {
                           minimumFractionDigits: token.price < 0.01 ? 6 : 2,
@@ -155,12 +155,12 @@ export default function TokenList({ portfolio }: TokenListProps) {
                         <div className="text-xs text-slate-500 dark:text-slate-400">No price data</div>
                       )}
                       {token.change24h && (
-                        <div className={`text-xs ${token.change24h >= 0 ? 'text-success' : 'text-danger'}`}>
+                        <div className={`text-xs ${token.change24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                           {token.change24h >= 0 ? '+' : ''}{token.change24h.toFixed(1)}% (24h)
                         </div>
                       )}
                     </td>
-                    <td className="py-4 text-right font-medium">
+                    <td className="py-4 text-right font-medium dark:text-primary token-value">
                       {token.value ? (
                         `$${token.value.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
@@ -174,7 +174,7 @@ export default function TokenList({ portfolio }: TokenListProps) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={5} className="py-8 text-center text-slate-500 dark:text-slate-300">
                     No tokens found matching your search criteria
                   </td>
                 </tr>
