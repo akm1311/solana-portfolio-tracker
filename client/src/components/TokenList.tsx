@@ -235,7 +235,12 @@ export default function TokenList({ portfolio }: TokenListProps) {
                               // If image fails to load, fall back to the gradient background with symbol
                               const target = e.target as HTMLImageElement;
                               target.style.display = 'none';
-                              target.nextElementSibling!.style.display = 'flex';
+                              
+                              // Get the next element and ensure it's an HTMLElement before accessing style
+                              const nextElement = target.nextElementSibling;
+                              if (nextElement && nextElement instanceof HTMLElement) {
+                                nextElement.style.display = 'flex';
+                              }
                             }}
                           />
                         ) : null}
