@@ -28,12 +28,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      let tokens = tokensResult.data;
+      // Initial token data
+      const initialTokens = tokensResult.data;
+      let filteredTokens = initialTokens;
+      let totalValue = 0;
       
       // If we have tokens, fetch prices from Jupiter API
-      if (tokens.length > 0) {
+      if (initialTokens.length > 0) {
         // Extract mint addresses
-        const mintAddresses = tokens.map(token => token.mint);
+        const mintAddresses = initialTokens.map(token => token.mint);
         
         // Fetch prices in batches of 100
         console.log(`Fetching price data for ${mintAddresses.length} tokens`);
@@ -43,12 +46,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const prices = priceResults.data;
           console.log(`Successfully received price data for ${Object.keys(prices).length} tokens`);
           
-          // Add price data to tokens and filter low liquidity tokens
+          // Process tokens with prices and apply filtering
           let tokensWithPrices = 0;
+          const validTokens: typeof initialTokens = [];
           
-          // Create a new filtered array of tokens
-          const validTokens = tokens.filter(token => {
-            // If we have price data for this token
+          // Process each token
+          for (const token of initialTokens) {
             if (prices[token.mint]) {
               // Add price and value data
               token.price = prices[token.mint];
@@ -58,44 +61,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Check if this token is in the filtered list
               const isFiltered = priceResults.filteredTokens?.includes(token.mint) || false;
               
-              // Skip tokens with very low liquidity (below $1000) unless they're exempted
-              if (isFiltered) {
-                // Only retain tokens with significant value
-                if (token.value >= 10) {
-                  console.log(`Including potentially low liquidity token ${token.symbol || token.mint} due to high value ($${token.value.toFixed(2)})`);
-                  return true;
-                }
+              // Skip tokens with very low liquidity (below $1000) unless they have significant value
+              if (isFiltered && token.value < 10) {
                 console.log(`Filtering out low liquidity token ${token.symbol || token.mint} with value $${token.value.toFixed(2)}`);
-                return false;
+                continue;
               }
               
-              // Log token details for tokens we're keeping
-              console.log(`Token ${token.symbol || token.mint}: Price=${token.price}, Balance=${token.uiBalance}, Value=${token.value}`);
-              return true;
+              if (isFiltered) {
+                console.log(`Including potentially low liquidity token ${token.symbol || token.mint} due to high value ($${token.value.toFixed(2)})`);
+              } else {
+                console.log(`Token ${token.symbol || token.mint}: Price=${token.price}, Balance=${token.uiBalance}, Value=${token.value}`);
+              }
+              
+              // Add to filtered list
+              validTokens.push(token);
             }
-            
-            // No price data, exclude from results
-            return false;
-          });
+          }
           
-          console.log(`Added price data to ${tokensWithPrices} out of ${tokens.length} tokens`);
+          console.log(`Added price data to ${tokensWithPrices} out of ${initialTokens.length} tokens`);
           console.log(`Filtered down to ${validTokens.length} valid tokens after liquidity check`);
           
-          // Replace the tokens array with our filtered version
-          tokens = validTokens;
+          // Use the filtered tokens for the result
+          filteredTokens = validTokens;
+          
+          // Calculate total value
+          totalValue = validTokens.reduce((sum, token) => sum + (token.value || 0), 0);
         } else {
           console.log(`Failed to get price data: ${priceResults.error}`);
+          
+          // If no price data, just calculate total based on the original tokens
+          totalValue = initialTokens.reduce((sum, token) => sum + (token.value || 0), 0);
         }
       }
       
-      // Calculate total value
-      const totalValue = tokens.reduce((sum, token) => sum + (token.value || 0), 0);
-      
       const portfolioData = {
         address,
-        tokens,
+        tokens: filteredTokens,
         totalValue,
-        tokenCount: tokens.length,
+        tokenCount: filteredTokens.length,
         lastUpdated: new Date().toLocaleString(),
       };
       
