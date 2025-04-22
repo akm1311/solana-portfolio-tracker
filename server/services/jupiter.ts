@@ -88,7 +88,7 @@ function getFromCache(cacheFile: string): any | null {
 }
 
 // Check token liquidity via BullX API
-async function checkTokenLiquidity(mintAddress: string): Promise<number> {
+async function checkTokenLiquidity(mintAddress: string): Promise<{liquidity: number, exists: boolean}> {
   try {
     console.log(`Checking liquidity for token ${mintAddress} via BullX API`);
     
@@ -98,7 +98,10 @@ async function checkTokenLiquidity(mintAddress: string): Promise<number> {
     // Return cached liquidity value if available
     if (metadataCache[mintAddress] && metadataCache[mintAddress].liquidity !== undefined) {
       console.log(`Found cached liquidity for ${mintAddress}: $${metadataCache[mintAddress].liquidity}`);
-      return metadataCache[mintAddress].liquidity || 0;
+      return {
+        liquidity: metadataCache[mintAddress].liquidity || 0,
+        exists: metadataCache[mintAddress].exists !== false // Default to true if not specifically marked as non-existent
+      };
     }
     
     // Query BullX API
@@ -121,19 +124,32 @@ async function checkTokenLiquidity(mintAddress: string): Promise<number> {
         // Update cache with liquidity data
         if (metadataCache[mintAddress]) {
           metadataCache[mintAddress].liquidity = liquidity;
+          metadataCache[mintAddress].exists = true;
           saveToCache(TOKEN_METADATA_CACHE_FILE, metadataCache);
         }
         
-        return liquidity;
+        return { liquidity, exists: true };
       }
+    } else {
+      // BullX returned empty array - this token likely doesn't exist or is a scam
+      console.log(`BullX API returned empty results for ${mintAddress} - likely a scam token`);
+      
+      // Mark as non-existent in cache
+      if (metadataCache[mintAddress]) {
+        metadataCache[mintAddress].exists = false;
+        metadataCache[mintAddress].liquidity = 0;
+        saveToCache(TOKEN_METADATA_CACHE_FILE, metadataCache);
+      }
+      
+      return { liquidity: 0, exists: false };
     }
     
-    // Default to 0 liquidity if not found
+    // Default to 0 liquidity if not found but don't mark as non-existent
     console.log(`No liquidity data found in BullX API for ${mintAddress}`);
-    return 0;
+    return { liquidity: 0, exists: true };
   } catch (error) {
     console.error(`Error checking liquidity for ${mintAddress}:`, error);
-    return 0;
+    return { liquidity: 0, exists: true }; // Don't mark as non-existent on error
   }
 }
 
@@ -294,9 +310,16 @@ export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceRe
         }
         
         // For high-value tokens (>$10k) that aren't verified, do a deep liquidity check via BullX API
-        if (tokenValue > DEEP_LIQUIDITY_CHECK_THRESHOLD) {
+        if (tokenValue > DEEP_LIQUIDITY_CHECK_THRESHOLD || mint === "MYSPACE") { // Special check for known problematic tokens
           console.log(`Token ${mint} has high value ($${tokenValue.toFixed(2)}), performing deep liquidity check`);
-          const liquidity = await checkTokenLiquidity(mint);
+          const { liquidity, exists } = await checkTokenLiquidity(mint);
+          
+          // First check if the token exists (is not a scam)
+          if (!exists) {
+            console.log(`Filtering out token ${mint} because it appears to be fraudulent (BullX API returned empty data)`);
+            filteredTokens.push(mint);
+            continue;
+          }
           
           // If liquidity is above threshold, include the token
           if (liquidity >= MIN_LIQUIDITY_THRESHOLD) {
