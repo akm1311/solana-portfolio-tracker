@@ -10,6 +10,8 @@ interface PriceResult {
 
 export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceResult> {
   try {
+    console.log(`Fetching prices for ${mintAddresses.length} tokens`);
+    
     // Process in batches of 100 as specified
     const batchSize = 100;
     const batches = [];
@@ -23,20 +25,35 @@ export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceRe
     // Process each batch
     for (const batch of batches) {
       const addressList = batch.join(',');
-      const url = `${JUP_API_BASE_URL}/prices?list_address=${addressList}`;
+      const url = `${JUP_API_BASE_URL}/prices?ids=${addressList}`;
+      
+      console.log(`Fetching batch of ${batch.length} tokens from Jupiter API`);
+      console.log(`Request URL: ${url}`);
       
       const response = await axios.get(url);
+      console.log(`Jupiter API response status: ${response.status}`);
+      
+      // Log structure of the response to understand format
+      console.log(`Response data structure: ${JSON.stringify(Object.keys(response.data))}`);
+      
       const data = response.data.data;
       
       if (data) {
+        console.log(`Received price data for ${Object.keys(data).length} tokens`);
+        
         // Merge data from this batch into the main result
         Object.keys(data).forEach(mint => {
           if (data[mint] && data[mint].price) {
             priceData[mint] = data[mint].price;
           }
         });
+      } else {
+        console.log(`No data returned from Jupiter API in this batch`);
+        console.log(`Full response: ${JSON.stringify(response.data)}`);
       }
     }
+    
+    console.log(`Final price data contains prices for ${Object.keys(priceData).length} tokens`);
     
     return {
       success: true,
