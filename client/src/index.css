@@ -117,3 +117,29 @@
   @apply text-gray-100;
 }
 
+/* Sortable column styles */
+.sortable-column {
+  @apply cursor-pointer transition-all duration-200;
+}
+
+.sortable-column:hover {
+  @apply text-primary dark:text-primary;
+}
+
+.sortable-column .sort-icon {
+  @apply inline-block ml-1 transition-transform duration-200;
+}
+
+.sortable-column .sort-icon.asc {
+  @apply transform rotate-0;
+}
+
+.sortable-column .sort-icon.desc {
+  @apply transform rotate-180;
+}
+
+/* Token styles */
+.token-row:hover {
+  @apply bg-gray-50 dark:bg-gray-800;
+}
+

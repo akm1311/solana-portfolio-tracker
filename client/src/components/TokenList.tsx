@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { Portfolio, Token } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,31 +7,79 @@ interface TokenListProps {
   portfolio: Portfolio;
 }
 
+type SortDirection = "asc" | "desc";
+type SortField = "value" | "name" | "balance";
+
 export default function TokenList({ portfolio }: TokenListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tokenType, setTokenType] = useState<"all" | "spl" | "nft">("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [sortField, setSortField] = useState<SortField>("value");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc"); // Default to highest value first
+  const itemsPerPage = 10; // Increased from 5 to show more tokens
 
   // Filter tokens based on search query and token type
-  const filteredTokens = portfolio.tokens.filter(token => {
-    const matchesSearch = 
-      !searchQuery || 
-      token.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      token.symbol?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      token.mint.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredTokens = useMemo(() => {
+    return portfolio.tokens.filter(token => {
+      const matchesSearch = 
+        !searchQuery || 
+        token.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        token.symbol?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        token.mint.toLowerCase().includes(searchQuery.toLowerCase());
+        
+      if (tokenType === "all") return matchesSearch;
+      if (tokenType === "nft") return matchesSearch && token.decimals === 0;
+      if (tokenType === "spl") return matchesSearch && token.decimals > 0;
       
-    if (tokenType === "all") return matchesSearch;
-    if (tokenType === "nft") return matchesSearch && token.decimals === 0;
-    if (tokenType === "spl") return matchesSearch && token.decimals > 0;
-    
-    return matchesSearch;
-  });
+      return matchesSearch;
+    });
+  }, [portfolio.tokens, searchQuery, tokenType]);
+
+  // Sort tokens based on current sort field and direction
+  const sortedTokens = useMemo(() => {
+    return [...filteredTokens].sort((a, b) => {
+      if (sortField === "value") {
+        const aValue = a.value || 0;
+        const bValue = b.value || 0;
+        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+      }
+      
+      if (sortField === "name") {
+        const aName = a.name || a.symbol || a.mint;
+        const bName = b.name || b.symbol || b.mint;
+        return sortDirection === "asc" 
+          ? aName.localeCompare(bName) 
+          : bName.localeCompare(aName);
+      }
+      
+      if (sortField === "balance") {
+        return sortDirection === "asc" 
+          ? a.uiBalance - b.uiBalance 
+          : b.uiBalance - a.uiBalance;
+      }
+      
+      return 0;
+    });
+  }, [filteredTokens, sortField, sortDirection]);
 
   // Paginate tokens
-  const totalPages = Math.ceil(filteredTokens.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedTokens.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedTokens = filteredTokens.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedTokens = sortedTokens.slice(startIndex, startIndex + itemsPerPage);
+  
+  // Toggle sort direction or set a new sort field
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle sort direction if clicking the same field
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      // Set new field and default to descending for value, ascending for others
+      setSortField(field);
+      setSortDirection(field === "value" ? "desc" : "asc");
+    }
+    // Reset to first page when changing sort
+    setCurrentPage(1);
+  };
 
   // Generate random gradient colors for tokens without symbols
   const getTokenColor = (index: number, symbol?: string) => {
@@ -109,10 +157,66 @@ export default function TokenList({ portfolio }: TokenListProps) {
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-700">
                 <th className="pb-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider w-12">#</th>
-                <th className="pb-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Token</th>
-                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Balance</th>
-                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Price</th>
-                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Value</th>
+                <th 
+                  className="pb-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider sortable-column"
+                  onClick={() => handleSort("name")}
+                >
+                  <div className="flex items-center">
+                    Token
+                    <span className={`sort-icon ml-1 ${sortField === "name" ? (sortDirection === "asc" ? "text-primary" : "text-primary") : "opacity-0"}`}>
+                      {sortField === "name" ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-3 w-3 ${sortDirection === "asc" ? "" : "transform rotate-180"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th 
+                  className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider sortable-column"
+                  onClick={() => handleSort("balance")}
+                >
+                  <div className="flex items-center justify-end">
+                    Balance
+                    <span className={`sort-icon ml-1 ${sortField === "balance" ? (sortDirection === "asc" ? "text-primary" : "text-primary") : "opacity-0"}`}>
+                      {sortField === "balance" ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-3 w-3 ${sortDirection === "asc" ? "" : "transform rotate-180"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">
+                  Price
+                </th>
+                <th 
+                  className="pb-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider sortable-column"
+                  onClick={() => handleSort("value")}
+                >
+                  <div className="flex items-center justify-end">
+                    Value
+                    <span className={`sort-icon ml-1 ${sortField === "value" ? (sortDirection === "asc" ? "text-primary" : "text-primary") : "opacity-0"}`}>
+                      {sortField === "value" ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-3 w-3 ${sortDirection === "asc" ? "" : "transform rotate-180"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </span>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -126,8 +230,14 @@ export default function TokenList({ portfolio }: TokenListProps) {
                           {token.symbol?.slice(0, 3) || "???"}
                         </div>
                         <div>
-                          <div className="font-medium dark:text-white token-symbol">{token.name || 'Unknown Token'}</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-300 font-mono">{token.symbol || token.mint.slice(0, 6)}</div>
+                          <div className="font-medium dark:text-white token-symbol">
+                            {token.name || 
+                             (token.symbol ? `${token.symbol} Token` : `Token ${token.mint.slice(0, 8)}...`)}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-300 font-mono">
+                            {token.symbol || 
+                             (token.mint.length > 10 ? `${token.mint.slice(0, 6)}...${token.mint.slice(-4)}` : token.mint)}
+                          </div>
                         </div>
                       </div>
                     </td>

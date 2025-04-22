@@ -115,36 +115,81 @@ export async function getSolanaTokens(walletAddress: string): Promise<TokenResul
   }
 }
 
-// Helper to get token metadata
+// Helper to get token metadata using the Helius API for enhanced metadata
 async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, { symbol: string, name: string }>> {
   try {
-    // Use Helius API to get token metadata
-    const response = await axios.post(HELIUS_RPC_URL, {
-      jsonrpc: "2.0",
-      id: "my-id",
-      method: "getTokenAccounts",
-      params: {
-        slotsByIndex: true,
-        mintAccounts: mints
-      }
-    });
-    
+    console.log(`Fetching metadata for ${mints.length} tokens...`);
     const results: Record<string, { symbol: string, name: string }> = {};
     
-    if (response.data && response.data.result) {
-      for (const item of response.data.result) {
-        if (item.mint && item.tokenInfo) {
-          results[item.mint] = {
-            symbol: item.tokenInfo.symbol || '',
-            name: item.tokenInfo.name || ''
-          };
+    // Process in smaller batches to avoid Request Entity Too Large error
+    const batchSize = 50;
+    for (let i = 0; i < mints.length; i += batchSize) {
+      const mintBatch = mints.slice(i, i + batchSize);
+      
+      try {
+        // Use the Helius API to get enhanced token metadata
+        // This API provides more comprehensive token information
+        const response = await axios.post(HELIUS_RPC_URL, {
+          jsonrpc: "2.0",
+          id: "helius-tokens",
+          method: "getTokenMetadata",
+          params: {
+            mintAccounts: mintBatch
+          }
+        });
+        
+        if (response.data && response.data.result) {
+          // Process the token metadata
+          for (const item of response.data.result) {
+            if (item && item.mint) {
+              // Get the best available name and symbol
+              const name = item.name || item.onChainMetadata?.metadata?.data?.name || '';
+              const symbol = item.symbol || item.onChainMetadata?.metadata?.data?.symbol || '';
+              
+              results[item.mint] = {
+                symbol: symbol,
+                name: name
+              };
+              
+              console.log(`Got metadata for ${item.mint}: ${name} (${symbol})`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching token metadata for batch ${i}-${i + batchSize}:`, error);
+        
+        // Fallback to simpler token account info for this batch
+        try {
+          const fallbackResponse = await axios.post(HELIUS_RPC_URL, {
+            jsonrpc: "2.0",
+            id: "token-accounts-fallback",
+            method: "getTokenAccounts",
+            params: {
+              slotsByIndex: true,
+              mintAccounts: mintBatch
+            }
+          });
+          
+          if (fallbackResponse.data && fallbackResponse.data.result) {
+            for (const item of fallbackResponse.data.result) {
+              if (item.mint && item.tokenInfo) {
+                results[item.mint] = {
+                  symbol: item.tokenInfo.symbol || '',
+                  name: item.tokenInfo.name || ''
+                };
+              }
+            }
+          }
+        } catch (fallbackError) {
+          console.error("Fallback metadata retrieval also failed:", fallbackError);
         }
       }
     }
     
+    console.log(`Successfully retrieved metadata for ${Object.keys(results).length} tokens`);
     return results;
   } catch (error) {
-    console.error("Error fetching token metadata:", error);
+    console.error("Error in token metadata process:", error);
     return {};
   }
 }
