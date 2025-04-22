@@ -35,7 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Extract mint addresses
         const mintAddresses = tokens.map(token => token.mint);
         
-        // Fetch prices in batches of 100
+        // First pass: Get all prices to determine token values
         console.log(`Fetching price data for ${mintAddresses.length} tokens`);
         const priceResults = await fetchTokenPrices(mintAddresses);
         
@@ -43,16 +43,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const prices = priceResults.data;
           console.log(`Successfully received price data for ${Object.keys(prices).length} tokens`);
           
-          // Add price data to tokens
-          let tokensWithPrices = 0;
+          // Add price data to tokens and calculate values
           tokens.forEach(token => {
             if (prices[token.mint]) {
               token.price = prices[token.mint];
               token.value = token.uiBalance * token.price;
-              tokensWithPrices++;
-              console.log(`Token ${token.symbol || token.mint}: Price=${token.price}, Balance=${token.uiBalance}, Value=${token.value}`);
             }
           });
+          
+          // Second pass: Check liquidity only for high-value tokens
+          const highValueTokens = tokens.filter(token => token.value && token.value > 10000);
+          const lowValueTokens = tokens.filter(token => !token.value || token.value <= 10000);
+          
+          console.log(`Found ${highValueTokens.length} high-value tokens (>$10,000) to check liquidity`);
+          
+          // Create separate arrays for tokens to check and tokens to keep
+          const highValueMints = highValueTokens.map(token => token.mint);
+          
+          // Only check DexScreener liquidity for high value tokens
+          if (highValueMints.length > 0) {
+            console.log(`Checking liquidity for ${highValueMints.length} high-value tokens...`);
+            const liquidityResults = await fetchTokenPrices(highValueMints, true); // true flag for liquidity check
+            
+            if (liquidityResults.success) {
+              const verifiedPrices = liquidityResults.data;
+              const filteredTokens = liquidityResults.filteredTokens || [];
+              
+              // Filter the high-value tokens based on liquidity check
+              highValueTokens.forEach(token => {
+                if (!verifiedPrices[token.mint]) {
+                  // If the token was filtered out due to liquidity, mark it
+                  token.price = undefined;
+                  token.value = undefined;
+                  console.log(`Filtered out high-value token ${token.symbol || token.mint} due to liquidity check`);
+                } else {
+                  console.log(`High-value token ${token.symbol || token.mint} passed liquidity check: Value=${token.value}`);
+                }
+              });
+            }
+          }
+          
+          // Count tokens with price data
+          let tokensWithPrices = tokens.filter(token => token.price !== undefined).length;
           console.log(`Added price data to ${tokensWithPrices} out of ${tokens.length} tokens`);
         } else {
           console.log(`Failed to get price data: ${priceResults.error}`);
