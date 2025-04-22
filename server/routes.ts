@@ -28,7 +28,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const tokens = tokensResult.data;
+      let tokens = tokensResult.data;
+      let filteredTokensCount = 0;
       
       // If we have tokens, fetch prices from Jupiter API
       if (tokens.length > 0) {
@@ -58,6 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Filter out tokens with organicScore = 0 (filtered tokens)
           if (priceResults.filteredTokens && priceResults.filteredTokens.length > 0) {
             console.log(`Filtering out ${priceResults.filteredTokens.length} low-quality tokens`);
+            filteredTokensCount = priceResults.filteredTokens.length;
             
             // Create a Set for O(1) lookups
             const filteredTokensSet = new Set(priceResults.filteredTokens);
@@ -92,7 +94,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tokenCount: tokens.length,
         lastUpdated: new Date().toLocaleString(),
         // Add detail about filtered tokens
-        filteredTokensCount: priceResults?.filteredTokens?.length || 0
+        filteredTokensCount
       };
       
       return res.json(portfolioData);
