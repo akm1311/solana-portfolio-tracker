@@ -193,10 +193,10 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
           {/* Asset allocation pie chart */}
           {pieChartData.length > 0 && (
             <div className="mt-6">
-              <div className="bg-light-surface dark:bg-gray-800 rounded-lg p-6 border dark:border-gray-700">
-                <div className="flex flex-col items-center">
-                  {/* Chart */}
-                  <div className="w-full h-64 max-w-md mx-auto">
+              <h3 className="text-lg font-medium mb-4 dark:text-white">Asset Allocation</h3>
+              <div className="bg-light-surface dark:bg-gray-800 rounded-lg p-4 border dark:border-gray-700">
+                <div className="flex flex-col md:flex-row items-center">
+                  <div className="w-full md:w-1/2 h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -206,46 +206,51 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
                           cx="50%"
                           cy="50%"
                           outerRadius={80}
-                          innerRadius={45}
+                          innerRadius={50}
                           labelLine={false}
-                          label={false} // Remove labels from chart directly
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         >
                           {pieChartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={1} />
+                            <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
+                        <Tooltip content={<CustomTooltip />} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                   
-                  {/* Legend */}
-                  <div className="w-full mt-8">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="w-full md:w-1/2 pl-0 md:pl-6 mt-4 md:mt-0">
+                    <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Top Holdings</h4>
+                    <div className="space-y-2">
                       {pieChartData.map((token, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full flex-shrink-0" 
-                            style={{ backgroundColor: token.color }}
-                          />
-                          <div className="flex gap-2 items-baseline flex-grow">
-                            <span className="text-sm font-medium dark:text-white">{token.name}</span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">({token.valueFormatted})</span>
+                        <div key={index} className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <div 
+                              className="w-3 h-3 rounded-full mr-2" 
+                              style={{ backgroundColor: token.color }}
+                            ></div>
+                            <span className="text-sm font-medium dark:text-slate-200">{token.name}</span>
                           </div>
-                          <div className="text-sm font-bold dark:text-white">{token.percentage}</div>
+                          <div className="text-sm dark:text-slate-300">
+                            ${token.value.toLocaleString(undefined, { 
+                              minimumFractionDigits: 2, 
+                              maximumFractionDigits: 2 
+                            })}
+                          </div>
                         </div>
                       ))}
                     </div>
-                  </div>
-                  
-                  {/* Tab-like buttons at the bottom */}
-                  <div className="mt-8 flex justify-center">
-                    <div className="inline-flex rounded-md overflow-hidden border dark:border-gray-600">
-                      <button className="px-4 py-2 bg-gray-700 text-white text-sm font-medium">
-                        Assets
-                      </button>
-                      <button className="px-4 py-2 bg-transparent text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-gray-800">
-                        Platforms
-                      </button>
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Total:</span>
+                        <span className="text-sm font-bold dark:text-primary">
+                          ${portfolio.totalValue.toLocaleString(undefined, { 
+                            minimumFractionDigits: 2, 
+                            maximumFractionDigits: 2 
+                          })}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
