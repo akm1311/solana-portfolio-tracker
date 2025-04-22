@@ -112,18 +112,18 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
     return colors[index % colors.length];
   }
   
-  // Custom tooltip for pie chart
+  // Custom tooltip for pie chart - making it more detailed since there are no labels
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white dark:bg-gray-800 p-2 rounded shadow-md border dark:border-gray-700">
-          <p className="font-medium">{data.name}</p>
-          <p className="text-sm">
+        <div className="bg-white dark:bg-gray-800 p-3 rounded shadow-md border dark:border-gray-700">
+          <p className="font-medium text-base">{data.name}</p>
+          <p className="text-sm mt-1 font-bold">
             ${data.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {((data.value / portfolio.totalValue) * 100).toFixed(1)}% of portfolio
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+            {((data.value / portfolio.totalValue) * 100).toFixed(2)}% of portfolio
           </p>
         </div>
       );
@@ -208,7 +208,7 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
                           outerRadius={80}
                           innerRadius={50}
                           labelLine={false}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          label={false}
                         >
                           {pieChartData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
