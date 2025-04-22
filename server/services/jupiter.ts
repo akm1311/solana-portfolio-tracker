@@ -1,6 +1,11 @@
 import axios from "axios";
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES modules-compatible way to get the directory name
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const JUP_API_BASE_URL = "https://fe-api.jup.ag/api/v1";
 const TOKEN_CACHE_DIR = path.join(__dirname, '..', 'cache');
