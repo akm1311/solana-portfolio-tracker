@@ -6,6 +6,62 @@ import { fetchTokenPrices } from "./services/jupiter";
 import { z } from "zod";
 import axios from "axios";
 
+/**
+ * Check token liquidity via BullX API and filter out scam tokens
+ */
+async function checkTokenLiquidity(token: any): Promise<boolean> {
+  try {
+    console.log(`Token ${token.symbol || token.mint} has high value ($${token.value?.toFixed(2)}), checking BullX API`);
+    
+    // Query BullX API directly for high-value tokens
+    const BULLX_API_URL = "https://api-neo.bullx.io/v2/searchV3";
+    const SOLANA_CHAIN_ID = "1399811149";
+    
+    // Add browser-like headers to avoid CloudFront blocking
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+      'Referer': 'https://bullx.io/',
+      'Origin': 'https://bullx.io',
+      'Accept': 'application/json'
+    };
+    
+    const url = `${BULLX_API_URL}?q=${token.mint}&chainIds=${SOLANA_CHAIN_ID}`;
+    console.log(`Requesting BullX API: ${url}`);
+    
+    const response = await axios.get(url, { headers });
+    
+    // If response is empty array - likely a scam token
+    if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+      console.log(`BullX API returned empty results for ${token.mint} (${token.symbol}) - filtering out scam token`);
+      return false;
+    }
+    
+    // Find the token in the response
+    const tokenData = response.data.find((t: any) => t.address === token.mint);
+    
+    // Check liquidity
+    if (tokenData && tokenData.liquidity !== undefined) {
+      const liquidity = parseFloat(tokenData.liquidity) || 0;
+      console.log(`BullX API reports liquidity for ${token.mint} (${token.symbol}): $${liquidity}`);
+      
+      // Filter out if liquidity is below threshold
+      if (liquidity < 1000) {
+        console.log(`Filtering out token ${token.symbol} due to low liquidity: $${liquidity}`);
+        return false;
+      }
+      
+      return true;
+    } else {
+      console.log(`No liquidity data found in BullX API for ${token.mint} (${token.symbol}) - filtering out`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`Error checking BullX API for ${token.mint} (${token.symbol}):`, error);
+    // On error, we'll keep the token (err on the side of showing more data)
+    return true;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // API endpoint to get portfolio data for a wallet
   app.get("/api/portfolio/:address", async (req, res) => {
@@ -76,47 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               // For high-value tokens (>$10k), do a more rigorous liquidity check
               if (token.value > 10000 || token.symbol === "MYSPACE") { // Also check known problematic tokens
-                try {
-                  console.log(`Token ${token.symbol || token.mint} has high value ($${token.value.toFixed(2)}), checking BullX API`);
-                  
-                  // Query BullX API directly for high-value tokens
-                  const BULLX_API_URL = "https://api-neo.bullx.io/v2/searchV3";
-                  const SOLANA_CHAIN_ID = "1399811149";
-                  
-                  const params = {
-                    q: token.mint,
-                    chainIds: SOLANA_CHAIN_ID
-                  };
-                  
-                  const response = await axios.get(BULLX_API_URL, { params });
-                  
-                  // Check if response is empty array - likely a scam token
-                  if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
-                    console.log(`BullX API returned empty results for ${token.mint} (${token.symbol}) - filtering out scam token`);
-                    isValid = false;
-                  } else {
-                    // Find the token in the response
-                    const tokenData = response.data.find((t: any) => t.address === token.mint);
-                    
-                    // Check liquidity
-                    if (tokenData && tokenData.liquidity !== undefined) {
-                      const liquidity = parseFloat(tokenData.liquidity) || 0;
-                      console.log(`BullX API reports liquidity for ${token.mint} (${token.symbol}): $${liquidity}`);
-                      
-                      // Filter out if liquidity is below threshold
-                      if (liquidity < 1000) {
-                        console.log(`Filtering out token ${token.symbol} due to low liquidity: $${liquidity}`);
-                        isValid = false;
-                      }
-                    } else {
-                      console.log(`No liquidity data found in BullX API for ${token.mint} (${token.symbol}) - filtering out`);
-                      isValid = false;
-                    }
-                  }
-                } catch (error) {
-                  console.error(`Error checking BullX API for ${token.mint} (${token.symbol}):`, error);
-                  // On error, we'll keep the token (err on the side of showing more data)
-                }
+                isValid = await checkTokenLiquidity(token);
               }
               
               // Final decision on whether to include the token
