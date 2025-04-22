@@ -1,6 +1,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import axios from "axios";
 import type { Token } from "@shared/schema";
+import { proxyRotator } from "./proxy";
 
 // Use Helius RPC endpoint
 const HELIUS_RPC_URL = "https://mainnet.helius-rpc.com/?api-key=6ebf9f53-df4d-4549-8258-c506ad07db38";
@@ -150,7 +151,18 @@ async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, {
     for (const mint of mints) {
       try {
         console.log(`Fetching Jupiter metadata for token: ${mint}`);
-        const response = await axios.get(`https://fe-api.jup.ag/api/v1/tokens/search?query=${mint}`);
+        
+        // Use the proxy rotator to make the request
+        // Add a delay to avoid rate limiting (between 100-300ms)
+        await new Promise(resolve => setTimeout(resolve, 100 + Math.floor(Math.random() * 200)));
+        
+        const response = await proxyRotator.get(`https://fe-api.jup.ag/api/v1/tokens/search?query=${mint}`, {
+          headers: {
+            // Add a custom key for Jupiter API (assuming they have some form of API key)
+            'x-jup-key': 'portfolio-tracker-app',
+            'x-jup-request-source': 'portfolio-tracker'
+          }
+        });
         
         if (response.data && response.data.tokens && response.data.tokens.length > 0) {
           // Find exact matching token by address

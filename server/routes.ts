@@ -5,6 +5,7 @@ import { getSolanaTokens } from "./services/solana";
 import { fetchTokenPrices } from "./services/jupiter";
 import { z } from "zod";
 import axios from "axios";
+import { proxyRotator } from "./services/proxy";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API endpoint to get portfolio data for a wallet
@@ -95,8 +96,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Check each high-value token with DexScreener
             for (const token of highValueTokens) {
               try {
-                // Use DexScreener API to check if token has liquidity
-                const response = await axios.get(`https://api.dexscreener.com/latest/dex/tokens/${token.mint}`);
+                // Add a delay between token checks (300-800ms)
+                await new Promise(resolve => setTimeout(resolve, 300 + Math.floor(Math.random() * 500)));
+                
+                // Use DexScreener API to check if token has liquidity via proxy rotator
+                const response = await proxyRotator.get(`https://api.dexscreener.com/latest/dex/tokens/${token.mint}`, {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'application/json',
+                    'Referer': 'https://dexscreener.com/',
+                  }
+                });
                 
                 // If pairs is null, this token has no liquidity
                 const hasLiquidity = response.data.pairs !== null;

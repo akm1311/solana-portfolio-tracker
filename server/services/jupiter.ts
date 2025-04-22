@@ -2,6 +2,7 @@ import axios from "axios";
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { proxyRotator } from "./proxy";
 
 // ES modules-compatible way to get the directory name
 const __filename = fileURLToPath(import.meta.url);
@@ -94,7 +95,17 @@ export async function getTokenMetadata(mintAddress: string): Promise<TokenMetada
     }
 
     // Not in cache, fetch from API
-    const response = await axios.get(`${JUP_API_BASE_URL}/tokens/search?query=${mintAddress}`);
+    // Add delay to respect rate limits (between 100-500ms)
+    await new Promise(resolve => setTimeout(resolve, 100 + Math.floor(Math.random() * 400)));
+    
+    // Use proxy rotator to fetch from Jupiter API
+    const response = await proxyRotator.get(`${JUP_API_BASE_URL}/tokens/search?query=${mintAddress}`, {
+      headers: {
+        'x-jup-key': 'portfolio-tracker-app',
+        'x-jup-request-source': 'portfolio-tracker',
+        'Referer': 'https://jup.ag/'
+      }
+    });
     
     if (response.data && response.data.data && response.data.data.length > 0) {
       const tokenData = response.data.data.find((token: any) => token.address === mintAddress);
@@ -159,7 +170,18 @@ export async function fetchTokenPrices(mintAddresses: string[], checkLiquidity: 
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
         
-        const response = await axios.get(url);
+        // Use the proxy rotator to distribute requests across different IPs
+        // Add a small random delay for rate limiting (between 500ms and 1.5s)
+        await new Promise(resolve => setTimeout(resolve, 500 + Math.floor(Math.random() * 1000)));
+        
+        // Use proxy rotator for API calls
+        const response = await proxyRotator.get(url, {
+          headers: {
+            // Add custom headers for Jupiter API
+            'x-jup-key': 'portfolio-tracker-app',
+            'x-jup-request-source': 'portfolio-tracker'
+          }
+        });
         
         // Check if the response has a 'prices' object (new API format)
         if (response.data.prices) {
@@ -228,8 +250,17 @@ export async function fetchTokenPrices(mintAddresses: string[], checkLiquidity: 
         // If checkLiquidity parameter is true, check with DexScreener
         if (checkLiquidity) {
           try {
-            // Use DexScreener API to check if token has liquidity
-            const response = await axios.get(`https://api.dexscreener.com/latest/dex/tokens/${mint}`);
+            // Add a delay for DexScreener API (between 200ms and 800ms)
+            await new Promise(resolve => setTimeout(resolve, 200 + Math.floor(Math.random() * 600)));
+            
+            // Use DexScreener API to check if token has liquidity (via proxy rotator)
+            const response = await proxyRotator.get(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
+              headers: {
+                // Use a different user agent for DexScreener
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'application/json'
+              }
+            });
             
             // If pairs is null, this token has no liquidity
             const hasLiquidity = response.data.pairs !== null;
@@ -237,9 +268,11 @@ export async function fetchTokenPrices(mintAddresses: string[], checkLiquidity: 
             if (hasLiquidity) {
               // Token has liquidity according to DexScreener
               priceData[mint] = price;
+              console.log(`Token ${mint} has liquidity according to DexScreener`);
             } else {
               // Token has no liquidity, filter it out
               filteredTokens.push(mint);
+              console.log(`Token ${mint} has NO liquidity according to DexScreener`);
               // Skip adding to priceData
               continue;
             }
