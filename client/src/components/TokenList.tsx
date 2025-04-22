@@ -226,9 +226,29 @@ export default function TokenList({ portfolio }: TokenListProps) {
                     <td className="py-4 text-sm text-slate-500 dark:text-slate-300">{startIndex + index + 1}</td>
                     <td className="py-4">
                       <div className="flex items-center">
-                        <div className={`h-8 w-8 rounded-full bg-gradient-to-r ${getTokenColor(index, token.symbol)} flex items-center justify-center text-white mr-3`}>
+                        {token.icon ? (
+                          <img 
+                            src={token.icon} 
+                            alt={token.symbol || "token"} 
+                            className="h-8 w-8 rounded-full mr-3 object-cover bg-slate-100 dark:bg-slate-800"
+                            onError={(e) => {
+                              // If image fails to load, fall back to the gradient background with symbol
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling!.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        
+                        {/* Fallback for when icon is not available or fails to load */}
+                        <div 
+                          className={`h-8 w-8 rounded-full bg-gradient-to-r ${getTokenColor(index, token.symbol)} 
+                                    flex items-center justify-center text-white mr-3
+                                    ${token.icon ? 'hidden' : ''}`}
+                        >
                           {token.symbol?.slice(0, 3) || "???"}
                         </div>
+                        
                         <div>
                           <div className="font-medium dark:text-white token-symbol">
                             {token.name || 
