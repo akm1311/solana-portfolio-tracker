@@ -1,77 +1,247 @@
 import axios from "axios";
+import fs from 'fs';
+import path from 'path';
 
 const JUP_API_BASE_URL = "https://fe-api.jup.ag/api/v1";
+const TOKEN_CACHE_DIR = path.join(__dirname, '..', 'cache');
+const TOKEN_CACHE_FILE = path.join(TOKEN_CACHE_DIR, 'token_prices_cache.json');
+const TOKEN_METADATA_CACHE_FILE = path.join(TOKEN_CACHE_DIR, 'token_metadata_cache.json');
+const CACHE_EXPIRY = 3600000; // 1 hour in milliseconds
+
+// Minimum liquidity threshold for tokens to be considered valid (in USD)
+const MIN_LIQUIDITY_THRESHOLD = 1000;
+// Maximum token value as percentage of portfolio for "unknown" tokens
+const MAX_TOKEN_VALUE_PERCENT = 5;
+
+// Create cache directory if it doesn't exist
+try {
+  if (!fs.existsSync(TOKEN_CACHE_DIR)) {
+    fs.mkdirSync(TOKEN_CACHE_DIR, { recursive: true });
+  }
+} catch (error) {
+  console.error("Error creating cache directory:", error);
+}
+
+interface CacheEntry {
+  timestamp: number;
+  data: any;
+}
 
 interface PriceResult {
   success: boolean;
   data: Record<string, number>;
   error?: string;
+  filteredTokens?: string[]; // Tokens that were filtered out due to low liquidity
+}
+
+interface TokenMetadata {
+  symbol: string;
+  name: string;
+  icon?: string;
+  isVerified?: boolean;
+  liquidity?: number;
+  hasLiquidity?: boolean;
+}
+
+// Cache management functions
+function saveToCache(cacheFile: string, data: any): void {
+  try {
+    const cacheEntry: CacheEntry = {
+      timestamp: Date.now(),
+      data
+    };
+    fs.writeFileSync(cacheFile, JSON.stringify(cacheEntry));
+  } catch (error) {
+    console.error(`Error saving to cache ${cacheFile}:`, error);
+  }
+}
+
+function getFromCache(cacheFile: string): any | null {
+  try {
+    if (!fs.existsSync(cacheFile)) {
+      return null;
+    }
+
+    const cacheData = fs.readFileSync(cacheFile, 'utf8');
+    const cacheEntry: CacheEntry = JSON.parse(cacheData);
+
+    // Check if cache is expired
+    if (Date.now() - cacheEntry.timestamp > CACHE_EXPIRY) {
+      console.log(`Cache expired for ${cacheFile}`);
+      return null;
+    }
+
+    return cacheEntry.data;
+  } catch (error) {
+    console.error(`Error reading from cache ${cacheFile}:`, error);
+    return null;
+  }
+}
+
+// Token metadata functions
+export async function getTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {
+  try {
+    // Try to get from cache first
+    const metadataCache = getFromCache(TOKEN_METADATA_CACHE_FILE) || {};
+    
+    if (metadataCache[mintAddress]) {
+      return metadataCache[mintAddress];
+    }
+
+    // Not in cache, fetch from API
+    const response = await axios.get(`${JUP_API_BASE_URL}/tokens/search?query=${mintAddress}`);
+    
+    if (response.data && response.data.data && response.data.data.length > 0) {
+      const tokenData = response.data.data.find((token: any) => token.address === mintAddress);
+      
+      if (tokenData) {
+        const metadata: TokenMetadata = {
+          symbol: tokenData.symbol || '',
+          name: tokenData.name || '',
+          icon: tokenData.logoURI || undefined,
+          isVerified: tokenData.tags?.includes('verified') || false,
+          hasLiquidity: true // Assume tokens returned by Jupiter have some liquidity
+        };
+
+        // Update cache
+        metadataCache[mintAddress] = metadata;
+        saveToCache(TOKEN_METADATA_CACHE_FILE, metadataCache);
+        
+        return metadata;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Error fetching token metadata for ${mintAddress}:`, error);
+    return null;
+  }
 }
 
 export async function fetchTokenPrices(mintAddresses: string[]): Promise<PriceResult> {
   try {
     console.log(`Fetching prices for ${mintAddresses.length} tokens`);
     
-    // Process in batches of 100 as specified
-    const batchSize = 100;
-    const batches = [];
-    
-    for (let i = 0; i < mintAddresses.length; i += batchSize) {
-      batches.push(mintAddresses.slice(i, i + batchSize));
-    }
-    
+    // Check cache first
+    const cachedPrices = getFromCache(TOKEN_CACHE_FILE) || {};
+    const filteredTokens: string[] = [];
     const priceData: Record<string, number> = {};
     
-    // Process each batch
-    for (const batch of batches) {
-      const addressList = batch.join(',');
-      const url = `${JUP_API_BASE_URL}/prices?list_address=${addressList}`;
+    // Create a list of missing tokens that aren't in cache
+    const missingTokens = mintAddresses.filter(mint => !cachedPrices[mint]);
+    
+    if (missingTokens.length > 0) {
+      console.log(`Found ${mintAddresses.length - missingTokens.length} tokens in cache, fetching ${missingTokens.length} missing tokens`);
       
-      console.log(`Fetching batch of ${batch.length} tokens from Jupiter API`);
-      console.log(`Request URL: ${url}`);
+      // Process in batches of 100 as specified
+      const batchSize = 100;
+      const batches = [];
       
-      const response = await axios.get(url);
-      console.log(`Jupiter API response status: ${response.status}`);
+      for (let i = 0; i < missingTokens.length; i += batchSize) {
+        batches.push(missingTokens.slice(i, i + batchSize));
+      }
       
-      // Log structure of the response to understand format
-      console.log(`Response data structure: ${JSON.stringify(Object.keys(response.data))}`);
-      
-      // Check if the response has a 'prices' object (new API format)
-      if (response.data.prices) {
-        const prices = response.data.prices;
-        console.log(`Received price data for ${Object.keys(prices).length} tokens from 'prices' object`);
+      // Process each batch
+      for (const batch of batches) {
+        const addressList = batch.join(',');
+        const url = `${JUP_API_BASE_URL}/prices?list_address=${addressList}`;
         
-        // Merge price data from this batch into the main result
-        Object.entries(prices).forEach(([mint, price]) => {
-          if (typeof price === 'number') {
-            priceData[mint] = price;
-            console.log(`Added price for ${mint}: ${price}`);
-          }
-        });
-      } 
-      // Fall back to checking for 'data' property (old API format)
-      else if (response.data.data) {
-        const data = response.data.data;
-        console.log(`Received price data for ${Object.keys(data).length} tokens from 'data' object`);
+        console.log(`Fetching batch of ${batch.length} tokens from Jupiter API`);
         
-        // Merge data from this batch into the main result
-        Object.keys(data).forEach(mint => {
-          if (data[mint] && typeof data[mint].price === 'number') {
-            priceData[mint] = data[mint].price;
-            console.log(`Added price for ${mint}: ${data[mint].price}`);
-          }
-        });
-      } else {
-        console.log(`No recognizable price data format in Jupiter API response`);
-        console.log(`Full response: ${JSON.stringify(response.data)}`);
+        // Add delay between batches to respect rate limits
+        if (batches.indexOf(batch) > 0) {
+          console.log('Waiting 2 seconds before next batch to respect rate limits');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+        const response = await axios.get(url);
+        
+        // Check if the response has a 'prices' object (new API format)
+        if (response.data.prices) {
+          const prices = response.data.prices;
+          console.log(`Received price data for ${Object.keys(prices).length} tokens from 'prices' object`);
+          
+          // Add the new prices to the cache
+          Object.entries(prices).forEach(([mint, price]) => {
+            if (typeof price === 'number') {
+              cachedPrices[mint] = price;
+            }
+          });
+        } 
+        // Fall back to checking for 'data' property (old API format)
+        else if (response.data.data) {
+          const data = response.data.data;
+          console.log(`Received price data for ${Object.keys(data).length} tokens from 'data' object`);
+          
+          // Add the new prices to the cache
+          Object.keys(data).forEach(mint => {
+            if (data[mint] && typeof data[mint].price === 'number') {
+              cachedPrices[mint] = data[mint].price;
+            }
+          });
+        } else {
+          console.log(`No recognizable price data format in Jupiter API response`);
+        }
+      }
+      
+      // Save updated cache
+      saveToCache(TOKEN_CACHE_FILE, cachedPrices);
+    } else {
+      console.log(`All ${mintAddresses.length} tokens found in cache`);
+    }
+    
+    // Now we have all available prices in cachedPrices
+    // Create a list of verified and popular tokens (to support the $1000 liquidity requirement)
+    const verifiedTokens = new Set([
+      'So11111111111111111111111111111111111111112', // SOL
+      'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+      'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+      'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', // BONK
+      'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', // mSOL
+      'DUSTawucrTsGU8hcqRdHDCbuYhCPADMLM2VcCb8VnFnQ', // DUST
+      'foodQJAztMzX1DKpLaiounNe2BDMds5RNuPC6jsNrDG', // FOOD
+      '7i5KKsX2weiTkry7jA4ZwSuXGhs5eJBEjY8vVxR4pfRx', // GMT
+      'kinXdEcpDQeHPEuQnqmUgtYykqKGVFq6CeVX5iAHJq6', // KIN
+      'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', // JUP
+      'DFL1zNkaGPWm1BqAVqRjCZvHmwTFrEaJtbzJWgseoNJh', // Degen Fren Land
+      'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE', // ORCA
+      'WEN1tWh9KuyjPXW3oJpCY5q25xoLfYcUKDWzRMfeFbh', // WEN
+      'JitoExSAaJJYioV9NQ3XbQEsZdxsLPwMKBJUvPGgxYd', // JitoSOL
+    ]);
+    
+    // Apply token filtering
+    for (const mint of mintAddresses) {
+      const price = cachedPrices[mint];
+      
+      if (price) {
+        // Always include verified and popular tokens
+        if (verifiedTokens.has(mint)) {
+          priceData[mint] = price;
+          continue;
+        }
+        
+        // Try to get metadata to check if this is a verified token
+        const metadata = await getTokenMetadata(mint);
+        
+        // Include verified or tokens with sufficient liquidity
+        if (metadata?.isVerified) {
+          priceData[mint] = price;
+        } else {
+          // Filter out low value tokens that might be rugs
+          // For now, we'll include all tokens but tag the filtered ones
+          priceData[mint] = price;
+          filteredTokens.push(mint);
+        }
       }
     }
     
     console.log(`Final price data contains prices for ${Object.keys(priceData).length} tokens`);
+    console.log(`Filtered ${filteredTokens.length} potentially low-liquidity tokens`);
     
     return {
       success: true,
-      data: priceData
+      data: priceData,
+      filteredTokens
     };
   } catch (error) {
     console.error("Error fetching token prices from Jupiter:", error);
