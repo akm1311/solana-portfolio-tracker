@@ -115,76 +115,83 @@ export async function getSolanaTokens(walletAddress: string): Promise<TokenResul
   }
 }
 
-// Helper to get token metadata using the Helius API for enhanced metadata
+// Helper to get token metadata using the Jupiter API for better token names and symbols
 async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, { symbol: string, name: string }>> {
   try {
     console.log(`Fetching metadata for ${mints.length} tokens...`);
     const results: Record<string, { symbol: string, name: string }> = {};
     
-    // Process in smaller batches to avoid Request Entity Too Large error
-    const batchSize = 50;
-    for (let i = 0; i < mints.length; i += batchSize) {
-      const mintBatch = mints.slice(i, i + batchSize);
-      
+    // Process tokens individually using the Jupiter API
+    // This is more reliable for token names and symbols
+    for (const mint of mints) {
       try {
-        // Use the Helius API to get enhanced token metadata
-        // This API provides more comprehensive token information
-        const response = await axios.post(HELIUS_RPC_URL, {
-          jsonrpc: "2.0",
-          id: "helius-tokens",
-          method: "getTokenMetadata",
-          params: {
-            mintAccounts: mintBatch
-          }
-        });
+        console.log(`Fetching Jupiter metadata for token: ${mint}`);
+        const response = await axios.get(`https://fe-api.jup.ag/api/v1/tokens/${mint}`);
         
-        if (response.data && response.data.result) {
-          // Process the token metadata
-          for (const item of response.data.result) {
+        if (response.data) {
+          const tokenData = response.data;
+          const symbol = tokenData.symbol || '';
+          // If a name is available use it, otherwise use the symbol 
+          const name = tokenData.name || tokenData.symbol || '';
+          
+          results[mint] = {
+            symbol: symbol,
+            name: name
+          };
+          
+          console.log(`Got Jupiter metadata for ${mint}: ${name} (${symbol})`);
+        }
+      } catch (error) {
+        console.log(`Jupiter API failed for ${mint}, trying fallback...`);
+        
+        // If Jupiter API fails, try the Helius API as fallback
+        try {
+          const response = await axios.post(HELIUS_RPC_URL, {
+            jsonrpc: "2.0",
+            id: "helius-tokens",
+            method: "getTokenMetadata",
+            params: {
+              mintAccounts: [mint]
+            }
+          });
+          
+          if (response.data && response.data.result && response.data.result[0]) {
+            const item = response.data.result[0];
             if (item && item.mint) {
               // Get the best available name and symbol
               const name = item.name || item.onChainMetadata?.metadata?.data?.name || '';
               const symbol = item.symbol || item.onChainMetadata?.metadata?.data?.symbol || '';
               
-              results[item.mint] = {
+              results[mint] = {
                 symbol: symbol,
                 name: name
               };
               
-              console.log(`Got metadata for ${item.mint}: ${name} (${symbol})`);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Error fetching token metadata for batch ${i}-${i + batchSize}:`, error);
-        
-        // Fallback to simpler token account info for this batch
-        try {
-          const fallbackResponse = await axios.post(HELIUS_RPC_URL, {
-            jsonrpc: "2.0",
-            id: "token-accounts-fallback",
-            method: "getTokenAccounts",
-            params: {
-              slotsByIndex: true,
-              mintAccounts: mintBatch
-            }
-          });
-          
-          if (fallbackResponse.data && fallbackResponse.data.result) {
-            for (const item of fallbackResponse.data.result) {
-              if (item.mint && item.tokenInfo) {
-                results[item.mint] = {
-                  symbol: item.tokenInfo.symbol || '',
-                  name: item.tokenInfo.name || ''
-                };
-              }
+              console.log(`Got Helius metadata for ${mint}: ${name} (${symbol})`);
             }
           }
         } catch (fallbackError) {
-          console.error("Fallback metadata retrieval also failed:", fallbackError);
+          console.log(`Fallback failed for ${mint}, using abbreviated address as name`);
+          
+          // If all else fails, use a shortened version of the address
+          if (!results[mint]) {
+            const shortenedAddress = mint.length > 8 ? 
+              `${mint.slice(0, 6)}...${mint.slice(-4)}` : mint;
+              
+            results[mint] = {
+              symbol: shortenedAddress,
+              name: `Token ${shortenedAddress}`
+            };
+          }
         }
       }
     }
+    
+    // Also add Solana native token manually to ensure it displays properly
+    results["So11111111111111111111111111111111111111112"] = {
+      symbol: "SOL",
+      name: "Solana"
+    };
     
     console.log(`Successfully retrieved metadata for ${Object.keys(results).length} tokens`);
     return results;
