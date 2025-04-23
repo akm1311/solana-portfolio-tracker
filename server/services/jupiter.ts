@@ -12,7 +12,8 @@ const JUP_API_BASE_URL = "https://fe-api.jup.ag/api/v1";
 const TOKEN_CACHE_DIR = path.join(__dirname, '..', 'cache');
 const TOKEN_CACHE_FILE = path.join(TOKEN_CACHE_DIR, 'token_prices_cache.json');
 const TOKEN_METADATA_CACHE_FILE = path.join(TOKEN_CACHE_DIR, 'token_metadata_cache.json');
-const CACHE_EXPIRY = 3600000; // 1 hour in milliseconds
+const CACHE_EXPIRY = 300000; // 5 minutes in milliseconds for fresh price data
+const METADATA_CACHE_EXPIRY = 86400000; // 24 hours for metadata (names, symbols, icons)
 
 // Minimum liquidity threshold for tokens to be considered valid (in USD)
 const MIN_LIQUIDITY_THRESHOLD = 1000;
@@ -70,13 +71,19 @@ function getFromCache(cacheFile: string): any | null {
 
     const cacheData = fs.readFileSync(cacheFile, 'utf8');
     const cacheEntry: CacheEntry = JSON.parse(cacheData);
+    
+    // Use different expiry times based on the cache file
+    const expiryTime = cacheFile === TOKEN_METADATA_CACHE_FILE 
+      ? METADATA_CACHE_EXPIRY  // Longer time for metadata (24h)
+      : CACHE_EXPIRY;          // Shorter time for prices (5m)
 
     // Check if cache is expired
-    if (Date.now() - cacheEntry.timestamp > CACHE_EXPIRY) {
-      console.log(`Cache expired for ${cacheFile}`);
+    if (Date.now() - cacheEntry.timestamp > expiryTime) {
+      console.log(`Cache expired for ${cacheFile} (expiry: ${expiryTime}ms)`);
       return null;
     }
 
+    console.log(`Using cached data from ${cacheFile}, age: ${Math.floor((Date.now() - cacheEntry.timestamp)/1000)}s`);
     return cacheEntry.data;
   } catch (error) {
     console.error(`Error reading from cache ${cacheFile}:`, error);

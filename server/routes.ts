@@ -8,6 +8,19 @@ import axios from "axios";
 import { proxyRotator } from "./services/proxy";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Helper function to clear price cache
+  const clearPriceCache = () => {
+    try {
+      const cacheFile = path.join(__dirname, 'cache', 'token_prices_cache.json');
+      if (fs.existsSync(cacheFile)) {
+        fs.unlinkSync(cacheFile);
+        console.log('Price cache cleared to ensure fresh data');
+      }
+    } catch (error) {
+      console.error('Error clearing price cache:', error);
+    }
+  };
+
   // API endpoint to get portfolio data for a wallet
   app.get("/api/portfolio/:address", async (req, res) => {
     try {
@@ -20,6 +33,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Invalid Solana wallet address format"
         });
       }
+      
+      // Clear price cache to ensure fresh data
+      clearPriceCache();
       
       // Fetch token data from Solana
       const tokensResult = await getSolanaTokens(address);
