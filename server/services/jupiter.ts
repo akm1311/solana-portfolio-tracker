@@ -177,11 +177,10 @@ export async function fetchTokenPrices(mintAddresses: string[], checkLiquidity: 
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
         
-        // Use the proxy rotator to distribute requests across different IPs
-        // Add a small random delay for rate limiting (between 500ms and 1.5s)
-        await new Promise(resolve => setTimeout(resolve, 500 + Math.floor(Math.random() * 1000)));
+        // Add a small delay to respect rate limits
+        await new Promise(resolve => setTimeout(resolve, 200));
         
-        // Use proxy rotator for API calls
+        // Make API call with our client
         const response = await proxyRotator.get(url, {
           headers: {
             // Add custom headers for Jupiter API
@@ -257,14 +256,12 @@ export async function fetchTokenPrices(mintAddresses: string[], checkLiquidity: 
         // If checkLiquidity parameter is true, check with DexScreener
         if (checkLiquidity) {
           try {
-            // Add a delay for DexScreener API (between 200ms and 800ms)
-            await new Promise(resolve => setTimeout(resolve, 200 + Math.floor(Math.random() * 600)));
+            // Add a small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 100));
             
-            // Use DexScreener API to check if token has liquidity (via proxy rotator)
+            // Use DexScreener API to check if token has liquidity
             const response = await proxyRotator.get(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
               headers: {
-                // Use a different user agent for DexScreener
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 'Accept': 'application/json'
               }
             });
