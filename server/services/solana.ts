@@ -152,9 +152,8 @@ async function getTokenMetadataBatch(mints: string[]): Promise<Record<string, {
       try {
         console.log(`Fetching Jupiter metadata for token: ${mint}`);
         
-        // Use the proxy rotator to make the request
-        // Add a delay to avoid rate limiting (between 100-300ms)
-        await new Promise(resolve => setTimeout(resolve, 100 + Math.floor(Math.random() * 200)));
+        // Add minimal delay for API rate limits
+        await new Promise(resolve => setTimeout(resolve, 50));
         
         const response = await proxyRotator.get(`https://fe-api.jup.ag/api/v1/tokens/search?query=${mint}`, {
           headers: {

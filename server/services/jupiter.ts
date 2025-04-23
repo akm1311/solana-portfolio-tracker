@@ -102,10 +102,10 @@ export async function getTokenMetadata(mintAddress: string): Promise<TokenMetada
     }
 
     // Not in cache, fetch from API
-    // Add delay to respect rate limits (between 100-500ms)
-    await new Promise(resolve => setTimeout(resolve, 100 + Math.floor(Math.random() * 400)));
+    // Add minimal delay to respect rate limits
+    await new Promise(resolve => setTimeout(resolve, 50));
     
-    // Use proxy rotator to fetch from Jupiter API
+    // Use our API client to fetch from Jupiter API
     const response = await proxyRotator.get(`${JUP_API_BASE_URL}/tokens/search?query=${mintAddress}`, {
       headers: {
         'x-jup-key': 'portfolio-tracker-app',
