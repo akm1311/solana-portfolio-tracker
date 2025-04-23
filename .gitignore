@@ -1,6 +1,55 @@
-node_modules
-dist
+# Node modules
+node_modules/
+
+# Environment variables and secrets
+.env
+.env.local
+.env.development
+.env.production
+*.env
+
+# Cache files
+server/cache/
+*/cache/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build files
+dist/
+build/
+.next/
+out/
+
+# Dependency directories
+.pnp/
+.pnp.js
+
+# Testing
+coverage/
+
+# IDE / editor specific files
+.idea/
+.vscode/
+*.swp
+*.swo
 .DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+.directory
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Replit specific files
+.replit
+.breakpoints
+replit.nix
+
+# Secrets configuration
+.env.secret
+.secret
+*.pem
