@@ -6,6 +6,8 @@ import { fetchTokenPrices } from "./services/jupiter";
 import { z } from "zod";
 import axios from "axios";
 import { proxyRotator } from "./services/proxy";
+import fs from 'fs';
+import path from 'path';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Helper function to clear price cache
